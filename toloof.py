@@ -15,8 +15,16 @@ from astropy.nddata import Cutout2D
 import matplotlib as mpl
 from math import factorial
 
-class citlali_maps:
+class CitlaliMaps:
 	def __init__(self,fitsfilepath):
+		"""
+		Load and parse a multi-extension FITS file into enmap objects.
+
+		Parameters:
+		----------
+		fits_file_path : str
+			Path to the FITS file containing map data.
+		"""
 		fitsfile = fits.open(fitsfilepath)
 
 		self.primary_header = fitsfile[0].header
@@ -52,59 +60,79 @@ class citlali_maps:
 				self.maps[key] = tmpenmap
 		fitsfile.close()
 
-	def convert_signalmap_to_MJypersr(self,arrayname):
-		if arrayname=='a2000':
-			beamsize = 10.*u.arcsec
-		elif arrayname=='a1400':
-			beamsize = 6.*u.arcsec
-		elif arrayname=='a1100':
-			beamsize = 5.*u.arcsec
-		beamsolidangle = 2*np.pi*(beamsize/2.355)**2
-		convertfactor = ((1.*u.mJy/(beamsolidangle)).to(u.MJy/u.sr)).value
-		self.maps['signal_I'] = self.maps['signal_I']*convertfactor
+	def convert_signalmap_to_MJypersr(self, array_name, map_key='signal_I'):
+		"""
+		Convert a map from mJy/beam to MJy/sr using an assumed beam size.
 
-	def make_submaps(self,boxcenter,boxsize):
+		Parameters
+		----------
+		array_name : str
+			Name of the instrument array (e.g., 'a2000', 'a1400', 'a1100').
+		map_key : str
+			Name of the map in self.maps to convert (default is 'signal_I').
+
+		Raises
+		------
+		ValueError
+			If the array_name is not recognized.
+		"""
+
+		beam_sizes = {
+			'a2000': 10. * u.arcsec,
+			'a1400': 6. * u.arcsec,
+			'a1100': 5. * u.arcsec,
+		}
+
+		if array_name not in beam_sizes:
+			raise ValueError(f"Unknown array_name: {array_name}")
+
+		beamsize = beam_sizes[array_name]
+		beam_solid_angle = 2 * np.pi * (beamsize / 2.355)**2
+		conversion_factor = (1. * u.mJy / beam_solid_angle).to(u.MJy / u.sr).value
+
+		self.maps[map_key] *= conversion_factor
+
+	def make_submaps(self, box_center, box_size_deg, map_keys=None):
+		"""
+		Create submaps centered on a given sky position.
+
+		Parameters
+		----------
+		box_center : tuple of float
+			(RA, Dec) center of the submap box, in degrees.
+		box_size_deg : float
+			Size of the square submap box, in degrees.
+		map_keys : list of str, optional
+			Subset of self.maps keys to extract. If None, use all maps.
+		"""
 		self.submaps = {}
-		box = np.deg2rad(np.array([[boxcenter[1]-boxsize/2.,boxcenter[0]+boxsize/2.],[boxcenter[1]+boxsize/2.,boxcenter[0]-boxsize/2.]]))
-		for i in self.maps:
-			self.submaps[i] = enmap.submap(self.maps[i],box)
 
+		ra, dec = box_center
+		half_size = box_size_deg / 2.
+		box = np.deg2rad(np.array([
+			[dec - half_size, ra + half_size],
+			[dec + half_size, ra - half_size]
+		]))
 
-	def fit_2DGaussian(self,
-		gauss_center_guess=np.array([0.,0.]),fwhms_guess=np.array([5./3600,5./3600.]),
-		theta_guess=0., amp_guess=None,bounds=None,
-		print_fit_results = False):
-		if not hasattr(self, 'submaps'):
-			print("submaps have not been generated. Do that first.")
-			return 0
-		else:
-			if amp_guess is None:
-				tmpampguess = np.amax(self.submaps['signal_I'])
-			else:
-				tmpampguess = amp_guess
-			beam_params = np.array([gauss_center_guess[0],gauss_center_guess[1],fwhms_guess[0],fwhms_guess[1],theta_guess,tmpampguess])
+		if map_keys is None:
+			map_keys = list(self.maps.keys())
 
-			if bounds is None:
-				bounds_center0 = (gauss_center_guess[0]-(5./3600.),gauss_center_guess[0]+(5./3600.))
-				bounds_center1 = (gauss_center_guess[1]-(5./3600.),gauss_center_guess[1]+(5./3600.))
-				bounds_fwhm0 = (5./3600.,12./3600.)
-				bounds_fwhm1 = (5./3600.,12./3600.)
-				bounds_theta0 = (-5,5)
-				bounds_amp = (0.75*np.amax(self.submaps['signal_I']),1.25*np.amax(self.submaps['signal_I']))
-				bounds_tot = (bounds_center0,bounds_center1,bounds_fwhm0,bounds_fwhm1,bounds_theta0,bounds_amp)
-
-
-			results = minimize(beam_fit_chisquare,beam_params,args=self.submaps['signal_I'],bounds=bounds_tot)
-			self.beamfit_results = results.x
-			if print_fit_results:
-				print_results(results)
-			tmpresults = gaussian_2D(self.submaps['signal_I'],[results.x[0],results.x[1]],[results.x[2],results.x[3]],results.x[4],results.x[5])
-			self.fitted_beam = tmpresults
-			return results
+		for key in map_keys:
+			self.submaps[key] = enmap.submap(self.maps[key], box)
 
 
 
 	def plot_summary(self,signal_map_vmin = None,signal_map_vmax=None):
+		"""
+		Plot a summary of the maps using WCS projections.
+
+		Parameters
+		----------
+		signal_map_vmin : float, optional
+			Minimum value for 'signal_I' map display. If None, computed automatically.
+		signal_map_vmax : float, optional
+			Maximum value for 'signal_I' map display. If None, computed automatically.
+		"""
 
 
 		fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 10), subplot_kw={'projection': self.maps['signal_I'].wcs})
@@ -153,6 +181,25 @@ class citlali_maps:
 
 
 def make_mask_enmap(testmap,radius_deg,centervals = None,apod_width = None):
+	"""
+	Generate a circular mask centered on a given sky coordinate.
+
+	Parameters
+	----------
+	testmap : enmap
+		Map defining the WCS and geometry.
+	radius_deg : float
+		Radius of the mask (in degrees).
+	centervals : tuple of float, optional
+		(RA, Dec) center in degrees. If None, uses the center of the map.
+	apod_width : float, optional
+		Width (in degrees) of apodization taper. If None, no apodization.
+
+	Returns
+	-------
+	mask_map : enmap
+		A binary or apodized mask in enmap format.
+	"""
 
 	opos0 = testmap.posmap()
 	dec0, ra0 = opos0[0,:,:],  opos0[1,:,:]
@@ -191,7 +238,27 @@ def make_mask_enmap(testmap,radius_deg,centervals = None,apod_width = None):
 		return apodmask
 
 def make_coordinate_grids(N,L):
-	## make coordinate arrays on the aperature palne
+	"""
+	Generate 2D Cartesian and polar coordinate grids over a square aperture.
+
+	Parameters
+	----------
+	N : int
+		Number of pixels along each axis (output arrays will be N x N).
+	L : float
+		Physical size of the aperture (in same units as desired output), spanning [-L/2, L/2] in both x and y.
+
+	Returns
+	-------
+	x : ndarray
+		2D array of x-coordinates, shape (N, N).
+	y : ndarray
+		2D array of y-coordinates, shape (N, N).
+	r : ndarray
+		2D array of radial distances from the center, same shape as x.
+	phi : ndarray
+		2D array of polar angles (in radians), measured counter-clockwise from +x axis.
+	"""
 	x,y = np.meshgrid(np.linspace(-L/2,L/2,N),  ## cartesian coordinates
 					  np.linspace(-L/2,L/2,N))
 	r = np.sqrt(x**2 + y**2)                    ## radial coordainte
@@ -199,13 +266,62 @@ def make_coordinate_grids(N,L):
 	return(x,y,r,phi)
 
 def gaussian(rarray,sig):
+	"""
+	Evaluate a normalized 2D circular Gaussian (without amplitude prefactor) over a radial array.
+
+	Parameters
+	----------
+	rarray : ndarray or float
+		Radial distance(s) from the center, typically in the same units as sigma.
+	sig : float
+		Standard deviation (σ) of the Gaussian.
+
+	Returns
+	-------
+	ndarray or float
+		Value(s) of the Gaussian evaluated at each radius in rarray.
+
+	Notes
+	-----
+	This returns only the exponential part of a 2D circular Gaussian:
+		exp(-0.5 * r^2 / σ^2)
+	The normalization factor (1 / (σ * sqrt(2π))) is omitted.
+	"""
 	return np.exp(-0.5*rarray**2/sig**2)#(1./(sig*np.sqrt(2.*np.pi)))*np.exp(-0.5*rarray**2/sig**2)
 def edge_taper(rarray,diameter):
 	tmparray = np.zeros(rarray.shape)
 	tmparray[np.where(rarray<diameter/2.)]=1.
-	return tmparray#(1./(sig*np.sqrt(2.*np.pi)))*np.exp(-0.5*rarray**2/sig**2)
+	return tmparray
 
 def Fraunhofer(A,wavelength,delta_x):
+	"""
+	Compute the Fraunhofer diffraction pattern of a 2D aperture field.
+
+	Parameters
+	----------
+	A : 2D ndarray
+		Complex or real-valued aperture field (e.g., electric field across an aperture).
+	wavelength : float
+		Wavelength of the incident wave, in the same units as delta_x.
+	delta_x : float
+		Physical size of one pixel in the aperture plane (e.g., in meters).
+
+	Returns
+	-------
+	angular_width : float
+		Angular size of one pixel in the diffraction (far-field) pattern, in arcminutes.
+	U : 2D ndarray
+		Fraunhofer diffraction pattern (Fourier transform of the aperture field), with zero frequency centered.
+
+	Notes
+	-----
+	This uses the 2D Fourier transform to compute the far-field (Fraunhofer) diffraction pattern:
+		U = FFT2[ A(x, y) ]
+
+	The angular scale is computed as:
+		θ = λ / Δx,
+	which gives radians per pixel. This is converted to arcminutes.
+	"""
 	U = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(A)))
 	angular_width = wavelength / delta_x  ## this is in radians
 	angular_width *= 180./np.pi       ## this converts to degrees
@@ -214,74 +330,296 @@ def Fraunhofer(A,wavelength,delta_x):
 	return(angular_width,U)
 
 def Convert_field_to_PSF(U):
+	"""
+	Convert a complex field (e.g., Fraunhofer diffraction pattern) to a point spread function (PSF).
+
+	Parameters
+	----------
+	U : 2D ndarray (complex)
+		Complex-valued field in the far-field (e.g., output of a Fraunhofer transform).
+
+	Returns
+	-------
+	PSF : 2D ndarray (float)
+		Power pattern (intensity) computed as the squared magnitude of U.
+	PSF_dB : 2D ndarray (float)
+		Logarithmic version of the PSF in decibels (dB), computed as:
+			10 * log10(PSF + ε),
+		where ε = 1e-25 is added to prevent log(0) errors.
+
+	Notes
+	-----
+	The PSF represents the power distribution in the image (or far-field) plane.
+	The dB version enhances dynamic range visibility, particularly for faint sidelobes.
+	"""
 	PSF = np.abs(U)**2
-	PSF_temp= PSF #/ np.max(PSF)  ## peak normalized-- not the right thing for convolution... but is nice for seeing it
+	PSF_temp= PSF 
 	## make a logrythmic version of the radiated power so we can better see faint features
 	PSF_temp +=1e-25 ## avoid infinities by regularizing zeroes
-	PSF_dB = 10#*np.log10(PSF_temp)
+	PSF_dB = 10*np.log10(PSF_temp)
 	return(PSF, PSF_dB)
 
 def radial_poly(n,m,rho):
-    if (n-abs(m))%2==1:
-        return np.zeros(rho.shape)
-    else:
-        topval = int((n-abs(m))/2.)
-        radial_poly = 0
+	"""
+	Compute the radial component of the Zernike polynomial.
 
-        for k in range(0,topval+1):
-            numerator = ((-1)**k)*factorial(int(n-k))
-            denominator = factorial(k)*factorial(int((n+abs(m))/2)-k)*factorial(int((n-abs(m))/2)-k)
-            radial_poly+= (numerator/denominator)*rho**(n-(2*k))
-            #k+=1
-        return radial_poly
-            
+	Parameters
+	----------
+	n : int
+		Radial order of the Zernike polynomial (non-negative integer).
+	m : int
+		Azimuthal frequency. Must satisfy |m| ≤ n and (n - |m|) even.
+	rho : ndarray or float
+		Radial coordinate(s), normalized to the unit disk (0 ≤ rho ≤ 1).
+
+	Returns
+	-------
+	radial_poly : ndarray or float
+		Values of the radial Zernike polynomial Rₙ^|m|(rho). Returns 0 if (n - |m|) is odd.
+
+	Notes
+	-----
+	The radial Zernike polynomial is defined as:
+
+		Rₙ^m(ρ) = ∑ₖ=0^[(n−|m|)/2] [(-1)^k * (n−k)!] /
+				  [k! ((n+|m|)/2 − k)! ((n−|m|)/2 − k)!] * ρ^(n − 2k)
+
+	This function returns zeros if the Zernike polynomial is undefined due to (n - |m|) being odd.
+	"""
+	if (n-abs(m))%2==1:
+		return np.zeros(rho.shape)
+	else:
+		topval = int((n-abs(m))/2.)
+		radial_poly = 0
+
+		for k in range(0,topval+1):
+			numerator = ((-1)**k)*factorial(int(n-k))
+			denominator = factorial(k)*factorial(int((n+abs(m))/2)-k)*factorial(int((n-abs(m))/2)-k)
+			radial_poly+= (numerator/denominator)*rho**(n-(2*k))
+			#k+=1
+		return radial_poly
+			
 def kron_delta(m,n):
-    if m==n:
-        return 1
-    else:
-        return 0
+	"""
+	Compute the Kronecker delta δₘₙ.
+
+	Parameters
+	----------
+	m : int
+		First index.
+	n : int
+		Second index.
+
+	Returns
+	-------
+	int
+		1 if m == n, else 0.
+
+	Notes
+	-----
+	The Kronecker delta δₘₙ is defined as:
+		δₘₙ = 1 if m = n,
+			  0 otherwise.
+	It is commonly used in summations and orthogonality conditions.
+	"""
+	if m==n:
+		return 1
+	else:
+		return 0
 def zern_normalization(n,m):
-    return np.sqrt((2.*(n+1))/(1+kron_delta(m,0)))
-    
+	"""
+	Compute the normalization factor for Zernike polynomials.
+
+	Parameters
+	----------
+	n : int
+		Radial order of the Zernike polynomial.
+	m : int
+		Azimuthal frequency of the Zernike polynomial.
+
+	Returns
+	-------
+	float
+		Normalization constant such that the Zernike polynomials are orthonormal
+		over the unit disk.
+
+	Notes
+	-----
+	The normalization factor is given by:
+
+		Nₙₘ = √[ (2(n + 1)) / (1 + δₘ₀) ]
+
+	where δₘ₀ is the Kronecker delta. This ensures:
+
+		∬ Zₙₘ(ρ, φ)² ρ dρ dφ = 1  over the unit disk.
+
+	For m ≠ 0, the factor is √(2(n + 1)); for m = 0, it is √(n + 1).
+	"""
+	return np.sqrt((2.*(n+1))/(1+kron_delta(m,0)))
+	
 
 def zernike_poly(n,m,rho,phi):
-    radial_part = radial_poly(n,abs(m),rho)
-    if m==0:
-        angular_part = 1.
-    elif m>0:
-        angular_part = np.cos(m*phi)
-    elif m<0:
-        angular_part = -np.sin(m*phi)
-    tmpzern = radial_part*angular_part
-    tmpzern[np.where(rho>0.9999)] = 0
-    return tmpzern*zern_normalization(n,m)
+	"""
+	Evaluate the Zernike polynomial Zₙᵐ(ρ, φ) over a unit disk.
+
+	Parameters
+	----------
+	n : int
+		Radial order of the Zernike polynomial (n ≥ 0).
+	m : int
+		Azimuthal frequency (can be positive, negative, or zero).
+		Must satisfy |m| ≤ n and (n - |m|) even.
+	rho : ndarray
+		Radial coordinate(s), normalized to [0, 1]. Should match shape of `phi`.
+	phi : ndarray
+		Angular coordinate(s), in radians. Should match shape of `rho`.
+
+	Returns
+	-------
+	zern : ndarray
+		Normalized Zernike polynomial evaluated at (ρ, φ).
+
+	Notes
+	-----
+	The Zernike polynomial is defined as:
+
+		Zₙᵐ(ρ, φ) = Rₙ^{|m|}(ρ) × cos(mφ)   for m > 0
+					Rₙ^{|m|}(ρ) × sin(|m|φ) for m < 0
+					Rₙ^0(ρ)                for m = 0
+
+	where Rₙ^{|m|}(ρ) is the radial Zernike polynomial.
+
+	The result is normalized such that:
+
+		∬ Zₙᵐ(ρ, φ)² ρ dρ dφ = 1  over the unit disk.
+
+	To prevent artifacts near the disk edge, the output is set to 0 where ρ > 0.9999.
+	"""
+	radial_part = radial_poly(n,abs(m),rho)
+	if m==0:
+		angular_part = 1.
+	elif m>0:
+		angular_part = np.cos(m*phi)
+	elif m<0:
+		angular_part = -np.sin(m*phi)
+	tmpzern = radial_part*angular_part
+	tmpzern[np.where(rho>0.9999)] = 0
+	return tmpzern*zern_normalization(n,m)
 
 def gen_zernike_polys(n,m,rho,phi):
-    if (n-m)%2!=0:
-        print('n-m must be even!!!!!')
-        return False
-    numberofpolys = ((n*(n+2))+m)/2
-    zernike_array = np.empty([int(numberofpolys)+1,rho.shape[0],rho.shape[1]])
-    for i in range(n+1):
-        m_max_tmp = i
-        for j in range(-m_max_tmp,m_max_tmp+1):
-            if (i-abs(j))%2==1:
-                continue
-            else:
-                jlabel = ((i*(i+2))+j)/2.
-                zernike_array[int(jlabel),:,:] = zernike_poly(i,j,rho,phi)
-    return zernike_array
+	"""
+	Generate all normalized Zernike polynomials Zₙᵐ(ρ, φ) up to radial order `n` 
+	and azimuthal frequency `m`.
+
+	Parameters
+	----------
+	n : int
+		Maximum radial order to compute. Must be ≥ 0.
+	m : int
+		Maximum azimuthal frequency. Must satisfy (n - m) even.
+	rho : ndarray
+		2D array of radial coordinates, normalized to [0, 1].
+	phi : ndarray
+		2D array of angular coordinates, in radians. Must have the same shape as `rho`.
+
+	Returns
+	-------
+	zernike_array : ndarray
+		3D array of shape (N, Ny, Nx), where each slice [k, :, :] is a Zernike polynomial.
+		N = ((n(n+2)) + m)/2 + 1. The ordering follows OSA/Fringe conventions.
+
+	Notes
+	-----
+	- This function constructs all valid Zernike polynomials (even (n - |m|)) 
+	  with radial order 0 ≤ n' ≤ n and azimuthal index -n' ≤ m' ≤ n'.
+	- Polynomials are indexed using the fringe (Noll-like) index:
+		  j = (n(n+2) + m) / 2
+	  which uniquely maps each (n, m) pair to an integer index.
+	- The result is normalized such that:
+		  ∬ Zₙᵐ(ρ, φ)² ρ dρ dφ = 1  over the unit disk.
+	- If (n - m) is odd, the function returns False and prints a warning.
+	"""
+	if (n-m)%2!=0:
+		print('n-m must be even!!!!!')
+		return False
+	numberofpolys = ((n*(n+2))+m)/2
+	zernike_array = np.empty([int(numberofpolys)+1,rho.shape[0],rho.shape[1]])
+	for i in range(n+1):
+		m_max_tmp = i
+		for j in range(-m_max_tmp,m_max_tmp+1):
+			if (i-abs(j))%2==1:
+				continue
+			else:
+				jlabel = ((i*(i+2))+j)/2.
+				zernike_array[int(jlabel),:,:] = zernike_poly(i,j,rho,phi)
+	return zernike_array
 
 def gen_defocus_cassegrain_telescope(r,dz,f=17.5,F=525.,D=50.):
-    a = r/(2.*f)
-    b = r/(2.*F)
-    tmpdefocus = dz*(((1-a**2)/(1+a**2))+((1-b**2)/(1+b**2)))
-    tmpdefocus[np.where(r>(D/2.))]=0
-    return tmpdefocus
+	"""
+	Generate the wavefront defocus profile for a classical Cassegrain telescope.
+
+	Parameters
+	----------
+	r : ndarray
+		Radial coordinate array (same units as `D`, typically meters), representing distance from the optical axis in the pupil plane.
+	dz : float
+		Physical displacement of the secondary mirror along the optical axis (in same units as `r` and `D`).
+	f : float, optional
+		Focal length of the primary mirror (default is 17.5 meters).
+	F : float, optional
+		Effective focal length of the Cassegrain system (default is 525 meters).
+	D : float, optional
+		Diameter of the primary mirror (default is 50 meters).
+
+	Returns
+	-------
+	tmpdefocus : ndarray
+		2D array representing the optical path difference (in same units as `dz`)
+		introduced by defocus, clipped to zero outside the aperture (r > D/2).
+
+	Notes
+	-----
+	The defocus wavefront error is computed using the geometric optics approximation
+	for a classical Cassegrain telescope, based on the primary and effective focal lengths.
+
+	The profile is clipped to zero beyond the edge of the circular aperture defined by `D/2`.
+
+	Formula used:
+		W(r) = dz × [ (1 - a²)/(1 + a²) + (1 - b²)/(1 + b²) ],
+		where a = r / (2f), b = r / (2F)
+	"""
+	a = r/(2.*f)
+	b = r/(2.*F)
+	tmpdefocus = dz*(((1-a**2)/(1+a**2))+((1-b**2)/(1+b**2)))
+	tmpdefocus[np.where(r>(D/2.))]=0
+	return tmpdefocus
 
 
 
 class Fraunhofer_Beamfit:
+	"""
+	A class to model and fit far-field beam patterns using Fraunhofer diffraction,
+	Zernike polynomials, and real input maps (e.g., from TolTEC/Citlali).
+
+	This class supports the simulation of PSFs through aperture illumination,
+	phase aberrations, and Cassegrain defocus, and fits observed beam maps
+	to recover surface errors and misalignments.
+
+	Parameters
+	----------
+	paths2files : list of str
+		List of FITS file paths to beam maps.
+	wavelength : float
+		Observing wavelength in meters.
+	mask_radius : float, optional
+		Radius (in degrees) of the mask used to isolate the beam (default: 2 arcmin).
+	map_center : list of float, optional
+		[RA, Dec] of the map center in degrees (default: [0., 0.]).
+	padpixels : int, optional
+		Number of pixels to pad maps before beam truncation.
+	inputfitsfileformat : str, optional
+		Format of input FITS files. Currently supports 'citlali'.
+	"""
 	def __init__(self,paths2files,wavelength,mask_radius=2./60.,map_center = [0.,0.],padpixels = None,inputfitsfileformat='citlali'):
 		
 		# this class fits one wavelength at a time
@@ -296,7 +634,7 @@ class Fraunhofer_Beamfit:
 		signalmaps = {}
 		mapnums = np.array(len(paths2files))
 		for i,path in enumerate(paths2files):
-			tmpmap = citlali_maps(path)
+			tmpmap = CitlaliMaps(path)
 			tmpmapdict['map'+str(i)] = tmpmap
 			signalmaps['map'+str(i)] = tmpmap.maps['signal_I']
 
@@ -338,6 +676,16 @@ class Fraunhofer_Beamfit:
 		self.noise_values = noise_values_tmp
 
 	def truncate_maps(self,desired_deltax_size,center_on_brightest_pix=True):
+		"""
+		Truncate the input maps to a square region around the beam center.
+
+		Parameters
+		----------
+		desired_deltax_size : float
+			Physical size (in wavelengths) to use for truncation box.
+		center_on_brightest_pix : bool, optional
+			Whether to center cutout on peak pixel or map center.
+		"""
 		self.newmapwcs = {}
 		self.trunc_maps = {}
 		self.peak_pixel = {}
@@ -362,6 +710,16 @@ class Fraunhofer_Beamfit:
 
 
 	def set_LMT_aperture(self,include_legs=False,plot_aperture=False):
+		"""
+		Create a circular aperture mask representing the LMT primary mirror.
+
+		Parameters
+		----------
+		include_legs : bool
+			Whether to simulate support legs (quadrupod shadows).
+		plot_aperture : bool
+			If True, show a plot of the resulting aperture field.
+		"""
 		
 		wavelength = self.wavelength
 		delta_x = abs(wavelength/np.deg2rad(self.trunc_maps['map0'].wcs.wcs.cdelt[1]*self.trunc_maps['map0'].shape[1]))
@@ -426,10 +784,32 @@ class Fraunhofer_Beamfit:
 			plt.show()
 
 	def get_zernike_polynomials(self,n,m):
+		"""
+		Generate Zernike polynomials over the normalized aperture.
+
+		Parameters
+		----------
+		n : int
+			Maximum radial order.
+		m : int
+			Maximum azimuthal index.
+		"""
 		diam_primary = 50. 
 		self.zernike_polynomials = gen_zernike_polys(n,m,self.r/(diam_primary/2.),self.phi)
 	
 	def set_phase(self,secondary_offset=0.,c=None,plot_phase=False):
+		"""
+		Apply a phase screen composed of Zernike coefficients and Cassegrain defocus.
+
+		Parameters
+		----------
+		secondary_offset : float
+			Longitudinal offset of secondary mirror in meters.
+		c : ndarray or None
+			Array of Zernike coefficients. If None, uses all zeros.
+		plot_phase : bool
+			If True, display the resulting phase map.
+		"""
 		
 		
 		if c is None:
@@ -439,7 +819,7 @@ class Fraunhofer_Beamfit:
 		Phi = np.zeros([self.zernike_polynomials.shape[1],self.zernike_polynomials.shape[2]])
 		for i in range(c.size):
 			Phi+=c[i]*self.zernike_polynomials[i,:,:]
-		delta_phase = gen_defocus_cassegrain_telescope(self.r,secondary_offset,f=17.5,F=525.,D=50.)
+		delta_phase = (2.*np.pi)*gen_defocus_cassegrain_telescope(self.r,secondary_offset,f=17.5,F=525.,D=50.)/self.wavelength
 
 		self.phase = Phi+delta_phase
 		#phase *= A
@@ -454,6 +834,18 @@ class Fraunhofer_Beamfit:
 			plt.show()
 
 	def set_illumination(self,aperture_fwhm = 48.,edge_taper_diameter=48.,plot_illumination=False):
+		"""
+		Define a radial Gaussian illumination function over the aperture.
+
+		Parameters
+		----------
+		aperture_fwhm : float
+			Full-width at half-maximum of the Gaussian illumination (in meters).
+		edge_taper_diameter : float
+			Diameter beyond which the illumination is zeroed.
+		plot_illumination : bool
+			If True, show a plot of the illumination pattern.
+		"""
 
 		sig0 = aperture_fwhm/(2*np.sqrt(2*np.log(2)))
 		edge_taper = np.ones([self.N['map0'],self.N['map0']])
@@ -470,6 +862,10 @@ class Fraunhofer_Beamfit:
 			plt.show()
 
 	def make_normalizing_amplitude(self):
+		"""
+		Calculate the peak PSF amplitude assuming a flat wavefront.
+		Used to normalize later PSF models.
+		"""
 		A_complex = self.Aperture*self.illumination#*np.exp(self.phase*1j)
 		angular_width,U = Fraunhofer(A_complex,self.wavelength,self.delta_x)
 		PSF_nom = np.abs(U)**2
@@ -478,12 +874,32 @@ class Fraunhofer_Beamfit:
 
 
 	def make_psf(self):
+		"""
+		Construct the modeled PSF using the current aperture, illumination, and phase.
+		Stores a normalized enmap PSF in `self.PSF`.
+		"""
 		A_complex = self.Aperture*self.illumination*np.exp(self.phase*1j)
 		angular_width,U = Fraunhofer(A_complex,self.wavelength,self.delta_x)
 		PSF,PSF_dB = Convert_field_to_PSF(U)
 		self.PSF = enmap.enmap(PSF/self.normalizing_amplitude,wcs=self.newmapwcs['map0'])
 	
 	def function2minimize(self,x):
+
+		"""
+		Objective function for beam model fitting.
+
+		Parameters
+		----------
+		x : array-like
+			Fit parameter vector including source amplitude, tilts, defocus,
+			and Zernike coefficients.
+
+		Returns
+		-------
+		float
+			RMS residuals across maps 0, 1, and 2 combined.
+		"""
+
 		#list of fit params
 		# x[0] = source amplitude
 		# x[1] = Map 0 X tilt
@@ -591,6 +1007,19 @@ class Fraunhofer_Beamfit:
 		return chisquare
 		
 	def fit_beam(self,c_guess=None,boundvals = None):
+
+		"""
+		Fit the beam model to the input maps by optimizing Zernike phase terms
+		and geometric defocus.
+
+		Parameters
+		----------
+		c_guess : array-like, optional
+			Initial guess for Zernike coefficients.
+		boundvals : list of tuples
+			Bounds for optimization variables, passed to scipy.optimize.minimize.
+		"""
+
 		#list of fit params
 		# x[0] = source amplitude
 		# x[1] = Primary Mirror focal length
@@ -709,6 +1138,18 @@ class Fraunhofer_Beamfit:
 		self.bestfitbeam = tmppsf_raw
 
 	def plot_phase(self,plot_vmin=None,plot_vmax=None,save_fig_name=None,noshow=False):
+		"""
+		Plot the current phase screen.
+
+		Parameters
+		----------
+		plot_vmin, plot_vmax : float, optional
+			Color limits.
+		save_fig_name : str, optional
+			Path to save the figure.
+		noshow : bool
+			If True, suppress display (for script automation).
+		"""
 		plt.figure()
 		plt.imshow(self.phase,vmin=plot_vmin,vmax=plot_vmax,extent=([-self.L/2, self.L/2, -self.L/2, self.L/2]))
 		plt.colorbar()
@@ -727,7 +1168,18 @@ class Fraunhofer_Beamfit:
 			plt.show()
 
 	def plot_surface_error(self,plot_vmin=None,plot_vmax=None,save_fig_name=None,noshow=False):
+		"""
+		Plot the inferred surface error (in microns) from the fitted phase screen.
 
+		Parameters
+		----------
+		plot_vmin, plot_vmax : float, optional
+			Color limits.
+		save_fig_name : str, optional
+			Path to save the figure.
+		noshow : bool
+			If True, suppress display.
+		"""
 		tmpwavelength = self.wavelength
 		
 		self.surface_error = 1E6*tmpwavelength*self.phase/(2*np.pi)
@@ -752,7 +1204,24 @@ class Fraunhofer_Beamfit:
 			plt.show()
 
 	def plot_results(self,plot_vmin=None,plot_vmax=None,resids_vmin=None,resids_vmax=None,save_fig_name=None,noshow=False,plot_title=None,lowerleft=[-0.75/60,-0.75/60.],upperright=[0.75/60,0.75/60.]):
-		
+		"""
+		Show a 3×3 panel plot of input maps, best-fit models, and residuals.
+
+		Parameters
+		----------
+		plot_vmin, plot_vmax : float, optional
+			Color scale limits for data/model maps.
+		resids_vmin, resids_vmax : float, optional
+			Color scale limits for residual maps.
+		save_fig_name : str, optional
+			File name to save the figure.
+		noshow : bool
+			If True, don't display figure.
+		plot_title : str, optional
+			Title to place above all subplots.
+		lowerleft, upperright : list of float
+			Sky coordinate box (in degrees) to show in each subplot.
+		"""
 		fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(15, 10), subplot_kw={'projection': self.trunc_maps['map0'].wcs})
 
 
@@ -920,6 +1389,18 @@ class Fraunhofer_Beamfit:
 			plt.show()
 
 	def plot_psf(self,plot_vmin=None,plot_vmax=None,save_fig_name=None,xlims=None,ylims=None):
+		"""
+		Display the final modeled PSF.
+
+		Parameters
+		----------
+		plot_vmin, plot_vmax : float, optional
+			Color limits.
+		save_fig_name : str, optional
+			File name to save the figure.
+		xlims, ylims : tuple, optional
+			Axes limits in degrees.
+		"""
 		corners_tmp = np.rad2deg(enmap.corners(self.PSF.shape,self.PSF.wcs))
 		imextent_tmp = [corners_tmp[0,1],corners_tmp[1,1],corners_tmp[0,0],corners_tmp[1,0]]
 		fig=plt.figure()
@@ -937,7 +1418,20 @@ class Fraunhofer_Beamfit:
 		plt.show()
 
 	def plot_inputmaps(self,plot_vmin=None,plot_vmax=None,save_fig_name=None,noshow=False,lowerleft=[-0.75/60,-0.75/60.],upperright=[0.75/60,0.75/60.]):
-		
+		"""
+		Plot the truncated input maps used in the beam fit.
+
+		Parameters
+		----------
+		plot_vmin, plot_vmax : float, optional
+			Color scale limits.
+		save_fig_name : str, optional
+			File name to save the figure.
+		noshow : bool
+			If True, suppress figure display.
+		lowerleft, upperright : list of float
+			Coordinate box in degrees to crop view.
+		"""
 		fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(15, 10), subplot_kw={'projection': self.trunc_maps['map0'].wcs})
 
 
