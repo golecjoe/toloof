@@ -594,6 +594,33 @@ def gen_defocus_cassegrain_telescope(r,dz,f=17.5,F=525.,D=50.):
 	tmpdefocus[np.where(r>(D/2.))]=0
 	return tmpdefocus
 
+def gen_phase_error_secondary_lat_displacement(x,y,del_x,del_y,f=17.5,F=525.,D=50.):
+	r = np.sqrt(x**2+y**2)
+	phi = np.arctan2(y,x)
+
+	sin_theta_p = (r/f)/((1+(r/(2.*f))**2))
+	sin_theta_f = (r/F)/((1+(r/(2.*F))**2))
+
+	tmpphaseerror = -((del_x*np.cos(phi))+(del_y*np.sin(phi)))*(sin_theta_p-sin_theta_f)
+	tmpphaseerror[np.where(r>(D/2.))]=0
+	return tmpphaseerror
+
+def gen_phase_error_secondary_tilt(x,y,del_alph_x,del_alph_y,f=17.5,F=525.,c_minus_a=0.8548,D=50.):
+	r = np.sqrt(x**2+y**2)
+	phi = np.arctan2(y,x)
+
+	sin_theta_p = (r/f)/((1+(r/(2.*f))**2))
+	sin_theta_f = (r/F)/((1+(r/(2.*F))**2))
+
+	M = F/f
+
+	del_alph_x_rad = np.deg2rad(del_alph_x)
+	del_alph_y_rad = np.deg2rad(del_alph_y)
+
+	tmpphaseerror = ((del_alph_x_rad*np.sin(phi))-(del_alph_y_rad*np.cos(phi)))*c_minus_a*(sin_theta_p+(M*sin_theta_f))
+	tmpphaseerror[np.where(r>(D/2.))]=0
+	return tmpphaseerror
+
 
 
 class Fraunhofer_Beamfit:
@@ -1582,7 +1609,8 @@ class Fraunhofer_Image:
 		diam_primary = 50. 
 		self.zernike_polynomials = gen_zernike_polys(n,m,self.r/(diam_primary/2.),self.phi)
 	
-	def set_phase(self,c=None,secondary_offset=0.,f=17.5,F=525.,D=50.,plot_phase=False):
+	def set_phase(self,c=None,secondary_offset=0.,del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
+		          f=17.5,F=525.,D=50.,plot_phase=False):
 		
 		
 		if c is None:
@@ -1593,8 +1621,10 @@ class Fraunhofer_Image:
 		for i in range(c.size):
 			Phi+=c[i]*self.zernike_polynomials[i,:,:]
 		delta_phase = gen_defocus_cassegrain_telescope(self.r,secondary_offset,f=f,F=F,D=D)
+		delta_phase2 = gen_phase_error_secondary_lat_displacement(self.x,self.y,del_x,del_y,f=f,F=F,D=D)
+		delta_phase3 = gen_phase_error_secondary_tilt(self.x,self.y,del_alph_x,del_alph_y,f=f,F=F,c_minus_a=0.8548,D=D)
 
-		self.phase = Phi+(delta_phase*2.*np.pi/self.wavelength)
+		self.phase = Phi+(delta_phase*2.*np.pi/self.wavelength)+(delta_phase2*2.*np.pi/self.wavelength)+(delta_phase3*2.*np.pi/self.wavelength)
 		#phase *= A
 		
 		if plot_phase:
