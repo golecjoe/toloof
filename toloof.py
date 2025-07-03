@@ -910,6 +910,27 @@ class Fraunhofer_Image:
 			plt.savefig(save_fig_name,facecolor='white',transparent=False,bbox_inches='tight')
 		plt.show()
 
+	def make_citlali_map(self,filename,sourceflux,noiselevel,rootpath=''):
+		noisemap = noiselevel*enmap.rand_gauss(self.PSF.shape,self.PSF.wcs)
+		self.noisemap = noisemap
+		outputmap = noisemap+(sourceflux*self.PSF)
+		self.outputmap = outputmap
+
+		primary_hdu = fits.PrimaryHDU(None,header=self.outputmap.wcs.to_header())
+		hdu1 = fits.ImageHDU(outputmap,header=outputmap.wcs.to_header())
+		hdu1.header['EXTNAME'] = 'signal_I'
+		hdu2 = fits.ImageHDU(None,header=outputmap.wcs.to_header())
+		hdu2.header['EXTNAME'] = 'weights_I'
+		hdu3 = fits.ImageHDU(None,header=outputmap.wcs.to_header())
+		hdu3.header['EXTNAME'] = 'coverage_I '
+		hdu4 = fits.ImageHDU(None,header=outputmap.wcs.to_header())
+		hdu4.header['EXTNAME'] = 'coverage_bool_I '
+		hdu5 = fits.ImageHDU(None,header=outputmap.wcs.to_header())
+		hdu5.header['EXTNAME'] = 'sig2noise_I '
+		hdul_save = fits.HDUList([primary_hdu, hdu1, hdu2,hdu3,hdu4,hdu5])
+
+		hdul_save.writeto(rootpath+filename,overwrite=True)
+
 
 class Fraunhofer_Beamfit:
 	"""
