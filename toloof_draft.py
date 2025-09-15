@@ -967,7 +967,7 @@ class Fraunhofer_Image:
 
 
 
-class Fraunhofer_Beamfit:
+class Fraunhofer_Beamfit_bandpass:
 	"""
 	A class to model and fit far-field beam patterns using Fraunhofer diffraction,
 	Zernike polynomials, and real input maps (e.g., from TolTEC/Citlali).
@@ -991,11 +991,17 @@ class Fraunhofer_Beamfit:
 	inputfitsfileformat : str, optional
 		Format of input FITS files. Currently supports 'citlali'.
 	"""
-	def __init__(self,paths2files,wavelength,mask_radius=2./60.,map_center = [0.,0.],padpixels = None,inputfitsfileformat='citlali'):
+	def __init__(self,paths2files,wavelengths,transmission=None,mask_radius=1./60.,map_center = [0.,0.],padpixels = None,inputfitsfileformat='citlali'):
 		
-		# this class fits one wavelength at a time
+		# this class integrates 
+
+		self.wavelengths = wavelengths
+		if transmission is None:
+			self.transmission = np.ones(self.wavelengths.size)
+		else:
+			self.transmission = transmission
 			
-		self.wavelength = wavelength
+		self.wavelength = wavelengths[0]
 		
 		self.surface_error = {}
 		
@@ -1021,6 +1027,8 @@ class Fraunhofer_Beamfit:
 				tmpmap.wcs.wcs.cunit[1] = 'deg'
 			signalmaps[i] = tmpmap
 
+
+
 		for i in signalmaps:
 			tmpmap = signalmaps[i]
 			tmpmapproj = enmap.project(tmpmap,signalmaps['map0'].shape,signalmaps['map0'].wcs)
@@ -1031,7 +1039,8 @@ class Fraunhofer_Beamfit:
 			if padpixels is not None:
 				tmpmap = enmap.pad(tmpmap,padpixels)
 			signalmaps[i] = tmpmap
-
+		
+		self.master_shape = signalmaps['map0'].shape
 		
 		self.original_maps = signalmaps
 
@@ -1040,12 +1049,6 @@ class Fraunhofer_Beamfit:
 		map_mask_tmp= make_mask_enmap(tmpmapload,mask_radius,centervals = map_center,apod_width = None)
 		self.map_mask = map_mask_tmp
 		
-		
-		maskinner = make_mask_enmap(tmpmapload,1./60.,centervals = map_center,apod_width = None)
-		noisering = tmpmapload*(map_mask_tmp-maskinner)
-		noise_values_tmp = np.sqrt(np.mean(noisering**2))
-		self.noise_values = noise_values_tmp
-
 	def truncate_maps(self,desired_deltax_size,center_on_brightest_pix=True):
 		"""
 		Truncate the input maps to a square region around the beam center.
@@ -1096,12 +1099,9 @@ class Fraunhofer_Beamfit:
 		wavelength = self.wavelength
 		delta_x = abs(wavelength/np.deg2rad(self.trunc_maps['map0'].wcs.wcs.cdelt[1]*self.trunc_maps['map0'].shape[1]))
 		self.delta_x = delta_x
-		#print('The Pixel Size in the Aperture Plane is ',delta_x, ' meters')
+		print('The Pixel Size in the Aperture Plane is ',delta_x, ' meters')
 		L = self.N['map0']*delta_x
-		diam_primary = 50. ## the diameter of the primary in meters
-		diam_secondary = 2.5 # diameter of the secondary in meters
-		legwidths = 0.5#0.125 # quadrupod leg width in meters
-		quadrupod_diam = 31. # diameter of circle defined by secondary suport
+		
 		###  make the coordinate grid
 		x,y,r,phi = make_coordinate_grids(self.N['map0'],L)
 
@@ -1110,38 +1110,7 @@ class Fraunhofer_Beamfit:
 		self.r = r
 		self.phi = phi
 		#figure out the legs better
-		xbins = x[0,:]
-		ybins = y[:,0]
-		self.xbins = xbins
-		self.ybins = ybins
-		# origx1 = x[np.where(np.logical_and(r<quadrupod_diam/2.,np.abs(x)<legwidths))]
-		# origy1 = y[np.where(np.logical_and(r<quadrupod_diam/2.,np.abs(x)<legwidths))]
-		# origx2 = x[np.where(np.logical_and(r<quadrupod_diam/2.,np.abs(y)<legwidths))]
-		# origy2 = y[np.where(np.logical_and(r<quadrupod_diam/2.,np.abs(y)<legwidths))]
-		# theta_rot = np.deg2rad(45.)
 		
-		# rotx1 = (np.cos(theta_rot)*origx1)-(np.sin(theta_rot)*origy1)
-		# roty1 = (np.sin(theta_rot)*origx1)+(np.cos(theta_rot)*origy1)
-		
-		# rotx1_digitize = np.digitize(rotx1, xbins)
-		# roty1_digitize = np.digitize(roty1, ybins)
-		
-		# rotx2 = (np.cos(theta_rot)*origx2)-(np.sin(theta_rot)*origy2)
-		# roty2 = (np.sin(theta_rot)*origx2)+(np.cos(theta_rot)*origy2)
-		
-		# rotx2_digitize = np.digitize(rotx2, xbins)
-		# roty2_digitize = np.digitize(roty2, ybins)
-		
-		# ## make the aperature fields THIS IS COMMON FOR ALL WAVELENGTHS
-		
-		# A = np.ones([self.N['map0'],self.N['map0']])
-		# A[np.where(r>diam_primary/2)] = 0
-		# A[np.where(r<diam_secondary/2.)] = 0
-		
-		# if include_legs:
-		# 	A[roty1_digitize,rotx1_digitize] = 0
-		# 	A[roty2_digitize,rotx2_digitize] = 0
-
 		primary_diamter = 50.
 		primaryaperture = np.ones(self.y.shape)
 		primaryaperture[self.r>primary_diamter/2.] = 0.
@@ -1213,9 +1182,9 @@ class Fraunhofer_Beamfit:
 			if save_aperture is not None:
 				plt.savefig(save_aperture,bbox_inches='tight')
 			plt.close()
-	def set_illumination(self,aperture_fwhm = 48.,edge_taper_diameter=48.,plot_illumination=False):
+	def set_illumination(self,aperture_fwhm = 48.,stop_diameter=48.,plot_illumination=False):
 		"""
-		Define a radial Gaussian illumination function over the aperture.
+		Define a radial Gaussian illumination function over the aperture. With a hard truncations
 
 		Parameters
 		----------
@@ -1228,9 +1197,8 @@ class Fraunhofer_Beamfit:
 		"""
 
 		sig0 = aperture_fwhm/(2*np.sqrt(2*np.log(2)))
-		edge_taper = np.ones([self.N['map0'],self.N['map0']])
-		edge_taper[np.where(self.r>edge_taper_diameter/2.)]=0
-		illumination = gaussian(self.r,sig0)*edge_taper
+		illumination = gaussian(self.r,sig0)
+		illumination[np.where(self.r>0.5*stop_diameter)] = 0
 		self.illumination = illumination
 		if plot_illumination:
 			plt.figure()
@@ -1255,48 +1223,10 @@ class Fraunhofer_Beamfit:
 		diam_primary = 50. 
 		self.zernike_polynomials = gen_zernike_polys(n,m,self.r/(diam_primary/2.),self.phi)
 	
-	def set_phase(self,c=None,secondary_offset=0.,del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
-				  f=17.5,F=525.,D=50.,plot_phase=False):
-		"""
-		Apply a phase screen composed of Zernike coefficients and Cassegrain defocus.
-
-		Parameters
-		----------
-		secondary_offset : float
-			Longitudinal offset of secondary mirror in meters.
-		c : ndarray or None
-			Array of Zernike coefficients. If None, uses all zeros.
-		plot_phase : bool
-			If True, display the resulting phase map.
-		"""
-		
-		
-		if c is None:
-			c = np.zeros(self.zernike_polynomials.shape[0])
-		c[0] = 0
-		
-		Phi = np.zeros([self.zernike_polynomials.shape[1],self.zernike_polynomials.shape[2]])
-		for i in range(c.size):
-			Phi+=c[i]*self.zernike_polynomials[i,:,:]
-		delta_phase = gen_defocus_cassegrain_telescope(self.r,secondary_offset,f=f,F=F,D=D)
-		delta_phase2 = gen_phase_error_secondary_lat_displacement(self.x,self.y,del_x,del_y,f=f,F=F,D=D)
-		delta_phase3 = gen_phase_error_secondary_tilt(self.x,self.y,del_alph_x,del_alph_y,f=f,F=F,c_minus_a=0.8548,D=D)
-
-
-		self.phase = Phi+((2.*np.pi)*delta_phase/self.wavelength)+((2.*np.pi)*delta_phase2/self.wavelength)+((2.*np.pi)*delta_phase3/self.wavelength)
-		#phase *= A
-		
-		if plot_phase:
-			plt.figure()
-			plt.imshow(self.phase,extent=([-self.L/2, self.L/2, -self.L/2, self.L/2]))
-			plt.title("Phase")
-			plt.xlabel("x [m]")
-			plt.ylabel("y [m]")
-			plt.colorbar()
-			plt.show()
+	
 
 	def make_phase(self,c=None,secondary_offset=0.,del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
-				  f=17.5,F=525.,D=50.):
+				  f=17.5,F=525.,D=50., plot_phase=False):
 
 		"""
 		Apply a phase screen composed of Zernike coefficients and Cassegrain defocus.
@@ -1325,7 +1255,42 @@ class Fraunhofer_Beamfit:
 
 
 		tmpphase = Phi+((2.*np.pi)*delta_phase/self.wavelength)+((2.*np.pi)*delta_phase2/self.wavelength)+((2.*np.pi)*delta_phase3/self.wavelength)
+
+		if plot_phase:
+			plt.figure()
+			plt.imshow(self.phase,extent=([-self.L/2, self.L/2, -self.L/2, self.L/2]))
+			plt.title("Phase")
+			plt.xlabel("x [m]")
+			plt.ylabel("y [m]")
+			plt.colorbar()
+			plt.show()
+
 		return tmpphase
+
+	def make_normalizing_amplitude(self):
+		norm_field = enmap.zeros(self.x.shape,self.newmapwcs['map0'],dtype=np.complex64)
+		nu_integral = 0.
+
+		tmpdelta_nus = np.diff(self.wavelengths)
+		delta_nus = np.zeros(tmpdelta_nus.size+1)
+		delta_nus[:-1] = tmpdelta_nus
+		delta_nus[-1] = tmpdelta_nus[-1]
+
+		for i,wave in enumerate(self.wavelengths[:-1]):
+
+			tmp_integrand_norm = self.Aperture*self.illumination
+			angular_width,U_norm = Fraunhofer(tmp_integrand_norm,wave,self.delta_x)
+			tmp_pixel_size = wave/np.deg2rad(self.delta_x*self.N['map0'])
+			tmp_wcs = wcsutils.build((0,0), res=tmp_pixel_size, shape=self.x.shape, system='tan')
+			U_enmap_norm = enmap.enmap(U_norm,tmp_wcs,dtype=np.complex64)
+			U_enmap_reproj_real_norm = enmap.project(U_enmap_norm.real,norm_field.shape,norm_field.wcs)
+			U_enmap_reproj_im_norm = enmap.project(U_enmap_norm.imag,norm_field.shape,norm_field.wcs)
+			norm_field += delta_nus[i]*self.transmission[i]*(U_enmap_reproj_real_norm+U_enmap_reproj_im_norm*1j)
+			nu_integral += delta_nus[i]*self.transmission[i]
+		norm_field = norm_field/nu_integral
+		PSF_norm_field = np.real(norm_field*np.conj(norm_field))
+		self.normalizing_amplitude = np.amax(PSF_norm_field)
+
 
 
 	def make_psf(self,phase=None,return_psf=False):
@@ -1336,151 +1301,50 @@ class Fraunhofer_Beamfit:
 		if phase is None:
 			phase = self.phase
 
-		A_complex = self.Aperture*self.illumination*np.exp(phase*1j)
+		phi_field = enmap.zeros(self.x.shape,self.newmapwcs['map0'],dtype=np.complex64)
 
-		field_maps_array = np.empty([self.bp_wavelengths.size,self.trunc_maps['map0'].shape[0],self.trunc_maps['map0'].shape[1]],dtype='complex')
+		nu_integral = 0.
 
-		for i,wavelength in enumerate(self.bp_wavelengths):
-			farfield_im_size, U = Fraunhofer(A_complex,wavelength,self.delta_x)
-			tmpwcs = build_tangent_wcs(U.shape[0], U.shape[1], farfield_im_size/self.N['map0'])
-			tmpUenmap_real = enmap.enmap(np.real(U),wcs=tmpwcs)
-			tmpUenmap_imag = enmap.enmap(np.imag(U),wcs=tmpwcs)
-			projUenmap_real = enmap.project(tmpUenmap_real,self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs)
-			projUenmap_imag = enmap.project(tmpUenmap_imag,self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs)
+		tmpdelta_nus = np.diff(self.wavelengths)
+		delta_nus = np.zeros(tmpdelta_nus.size+1)
+		delta_nus[:-1] = tmpdelta_nus
+		delta_nus[-1] = tmpdelta_nus[-1]
 
-			projUenmap_complex = enmap.enmap((projUenmap_real+projUenmap_imag*1.j),wcs=projUenmap_real.wcs)
+		for i,wave in enumerate(self.wavelengths[:-1]):
+			tmp_integrand = self.Aperture*self.illumination*np.exp(phase*1j)
+			tmp_integrand_norm = self.Aperture*self.illumination
+			angular_width,U = Fraunhofer(tmp_integrand,wave,self.delta_x)
+			tmp_pixel_size = wave/np.deg2rad(self.delta_x*self.N['map0'])
+			tmp_wcs = wcsutils.build((0,0), res=tmp_pixel_size, shape=self.x.shape, system='tan')
+			U_enmap = enmap.enmap(U,tmp_wcs,dtype=np.complex64)
+			U_enmap_reproj_real = enmap.project(U_enmap.real,phi_field.shape,phi_field.wcs)
+			U_enmap_reproj_im = enmap.project(U_enmap.imag,phi_field.shape,phi_field.wcs)
 
-			field_maps_array[i,:,:] = projUenmap_complex*self.bp_transmission[i]
+			phi_field += delta_nus[i]*self.transmission[i]*(U_enmap_reproj_real+U_enmap_reproj_im*1j)
 
-		#do the integrals
-		
-		integrated_field = np.trapz(field_maps_array,x=self.bp_wavelengths,axis=0)
-		integrated_bp = np.trapz(self.bp_transmission,x=self.bp_wavelengths,axis=0)
+			nu_integral += delta_nus[i]*self.transmission[i]
+		phi_field = phi_field/nu_integral
 
-		far_field_map = integrated_field/integrated_bp
+		PSF = phi_field*np.conj(phi_field)
 
+		self.PSF = enmap.enmap(PSF.real.astype(np.float32)/self.normalizing_amplitude,wcs=self.newmapwcs['map0'],dtype=np.float64)
 
-		PSF,PSF_dB = Convert_field_to_PSF(far_field_map)
-		self.PSF = enmap.enmap(PSF/self.normalizing_amplitude,wcs=self.newmapwcs['map0'])
 		if return_psf:
 			return self.PSF
-
-	def make_psf_monochromatic(self,phase=None,return_psf=False):
-		"""
-		Construct the modeled PSF using the current aperture, illumination, and phase.
-		Stores a normalized enmap PSF in `self.PSF`.
-		"""
-		if phase is None:
-			phase = self.phase
-
-		A_complex = self.Aperture*self.illumination*np.exp(phase*1j)
-		farfield_im_size, U = Fraunhofer(A_complex,self.wavelength,self.delta_x)
-
-		PSF,PSF_dB = Convert_field_to_PSF(U)
-		self.PSF = enmap.enmap(PSF/self.normalizing_amplitude_monochromatic,wcs=self.newmapwcs['map0'])
-		if return_psf:
-			return self.PSF
-
-
-	def make_normalizing_amplitude(self):
-		"""
-		Calculate the peak PSF amplitude assuming a flat wavefront.
-		Used to normalize later PSF models.
-		"""
-		
-
-		A_complex = self.Aperture*self.illumination
-
-		field_maps_array = np.empty([self.bp_wavelengths.size,self.trunc_maps['map0'].shape[0],self.trunc_maps['map0'].shape[1]],dtype='complex')
-
-		for i,wavelength in enumerate(self.bp_wavelengths):
-			farfield_im_size, U = Fraunhofer(A_complex,wavelength,self.delta_x)
-			tmpwcs = build_tangent_wcs(U.shape[0], U.shape[1], farfield_im_size/self.N['map0'])
-			tmpUenmap_real = enmap.enmap(np.real(U),wcs=tmpwcs)
-			tmpUenmap_imag = enmap.enmap(np.imag(U),wcs=tmpwcs)
-			projUenmap_real = enmap.project(tmpUenmap_real,self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs)
-			projUenmap_imag = enmap.project(tmpUenmap_imag,self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs)
-
-			projUenmap_complex = enmap.enmap((projUenmap_real+projUenmap_imag*1.j),wcs=projUenmap_real.wcs)
-
-			field_maps_array[i,:,:] = projUenmap_complex*self.bp_transmission[i]
-
-		#do the integrals
-		
-		integrated_field = np.trapz(field_maps_array,x=self.bp_wavelengths,axis=0)
-		integrated_bp = np.trapz(self.bp_transmission,x=self.bp_wavelengths,axis=0)
-
-		far_field_map = integrated_field/integrated_bp
-
-
-		PSF,PSF_dB = Convert_field_to_PSF(far_field_map)
-		tmppsf = enmap.enmap(PSF,wcs=self.newmapwcs['map0'])
-
-		farfield_im_size_mono, U_mono = Fraunhofer(A_complex,self.wavelength,self.delta_x)
-		PSF_mono,PSF_dB_mono = Convert_field_to_PSF(U_mono)
-
-		self.normalizing_amplitude = np.amax(tmppsf)
-		self.normalizing_amplitude_monochromatic = np.amax(PSF_mono)
-
-	def get_toltec_bandpass(self,bandstr,interpwavelengths,plot_bandpass=False,
-							pathtobpfile='/Users/golecjoe/Documents/Work/TolTEC/toloof/model_passbands.npz'):
-
-		allowed_bands = {'band_150', 'band_220', 'band_280'}
-	
-		if bandstr not in allowed_bands:
-			raise ValueError(f"'{bandstr}' is not a valid band. Choose from {allowed_bands}.")
-		path = Path(pathtobpfile)
-	
-		if not path.exists():
-			raise FileNotFoundError(f"File '{pathtobpfile}' does not exist.")
-
-		bpfile = np.load(pathtobpfile)
-
-		wavelength_bp = 1E-3*(300.)/bpfile['f_GHz']
-
-		idx2 = np.argsort(interpwavelengths)
-		interpwavelengths = interpwavelengths[idx2]
-
-		idx = np.argsort(wavelength_bp)
-		wavelength_bp = wavelength_bp[idx]
-		bandpass = bpfile[bandstr][idx]
-		bptransinterp = np.interp(interpwavelengths, wavelength_bp, bandpass)
-		if plot_bandpass:
-			plt.figure()
-			plt.plot(interpwavelengths*1E3,bptransinterp,'.',c='r',label='Interpolated Bandpass')
-			plt.plot(wavelength_bp*1E3,bandpass,c='k',label='Bandpass')
-			plt.xlim(np.amin(interpwavelengths*1E3),np.amax(interpwavelengths*1E3))
-			plt.xlabel('Wavelengths (mm)')
-			plt.ylabel('Transmission')
-			plt.show()
-
-
-		self.bp_wavelengths = interpwavelengths
-		self.bp_transmission = bptransinterp
-
-
-
-
-
 
 
 
 	def initialize_model(self,
-						aperture_plane_resolution = 1.,center_on_brightest_pix=False,
-						include_legs=False,plot_aperture=False,save_aperture=None,
-						aperture_fwhm = 48.,edge_taper_diameter=48.,plot_illumination=False,
-						n=4,m=4,
-						bandstr='band_150', interpwavelengths=300E-3/np.linspace(110,170,20),plot_bandpass=False,
-						pathtobpfile='/Users/golecjoe/Documents/Work/TolTEC/toloof/model_passbands.npz'):
+						aperture_plane_resolution = 1.,center_on_brightest_pix=True,
+						include_legs=True,plot_aperture=False,save_aperture=None,
+						aperture_fwhm = 48.,stop_diameter=48.,plot_illumination=False,
+						n=4,m=4):
 		self.truncate_maps(aperture_plane_resolution,center_on_brightest_pix=center_on_brightest_pix)
 		self.set_LMT_aperture(include_legs=include_legs,plot_aperture=plot_aperture,save_aperture=save_aperture)
-		self.set_illumination(aperture_fwhm = aperture_fwhm,edge_taper_diameter=edge_taper_diameter,plot_illumination=plot_illumination)
+		self.set_illumination(aperture_fwhm = aperture_fwhm,stop_diameter=stop_diameter,plot_illumination=plot_illumination)
 		self.get_zernike_polynomials(n,m)
-		self.get_toltec_bandpass(bandstr,interpwavelengths,plot_bandpass=plot_bandpass,pathtobpfile=pathtobpfile)
 		self.make_normalizing_amplitude()
 
-
-	
 	def function2minimize(self,x,secondary_throw_array):
 
 		"""
@@ -1740,12 +1604,6 @@ class Fraunhofer_Beamfit:
 
 
 
-	def plot_bandpass(self):
-		plt.figure()
-		plt.plot(1E3*self.bp_wavelengths,self.bp_transmission)
-		plt.xlabel('wavelengths (mm)')
-		plt.ylabel('Transmission')
-		plt.show()
 
 	def plot_phase(self,plot_vmin=None,plot_vmax=None,save_fig_name=None,noshow=False):
 		"""
@@ -2194,10 +2052,9 @@ class Fraunhofer_Beamfit:
 
 		phase0 = self.make_phase(c=c_map0,secondary_offset=x[1]+secondary_throw_array[0],del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
 								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			model_map0 = self.make_psf(phase=phase0,return_psf=True)*x[0]
-		else:
-			model_map0 = self.make_psf_monochromatic(phase=phase0,return_psf=True)*x[0]
+	
+		model_map0 = self.make_psf(phase=phase0,return_psf=True)*x[0]
+
 		resids_map0 = self.trunc_maps['map0'] - model_map0
 		rms_map0 = np.sqrt(np.mean(resids_map0**2))
 
@@ -2207,10 +2064,8 @@ class Fraunhofer_Beamfit:
 		# 						  f=x[1],F=525.,D=50.)
 		phase1 = self.make_phase(c=c_map1,secondary_offset=x[1]+secondary_throw_array[1],del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
 								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			model_map1 = self.make_psf(phase=phase1,return_psf=True)*x[0]
-		else:
-			model_map1 = self.make_psf_monochromatic(phase=phase1,return_psf=True)*x[0]
+
+		model_map1 = self.make_psf(phase=phase1,return_psf=True)*x[0]
 		
 		resids_map1 = self.trunc_maps['map1'] - model_map1
 		rms_map1 = np.sqrt(np.mean(resids_map1**2))
@@ -2221,10 +2076,8 @@ class Fraunhofer_Beamfit:
 		# 						  f=x[1],F=525.,D=50.)
 		phase2 = self.make_phase(c=c_map2,secondary_offset=x[1]+secondary_throw_array[2],del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
 								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			model_map2 = self.make_psf(phase=phase2,return_psf=True)*x[0]
-		else:
-			model_map2 = self.make_psf_monochromatic(phase=phase2,return_psf=True)*x[0]
+		model_map2 = self.make_psf(phase=phase2,return_psf=True)*x[0]
+
 		
 		resids_map2 = self.trunc_maps['map2'] - model_map2
 		rms_map2 = np.sqrt(np.mean(resids_map2**2))
@@ -2318,47 +2171,35 @@ class Fraunhofer_Beamfit:
 		# 						  f=results.x[1],F=525.,D=50.)
 		phase0_fit = self.make_phase(c=c_bestfit_map0,secondary_offset=results.x[1]+secondary_throw_array[0],del_x=0.,del_y=0.,del_alph_x=0,del_alph_y=0,
 								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			tmppsf_raw = self.make_psf(phase=phase0_fit,return_psf=True)*results.x[0]
 
-		else:
-			tmppsf_raw = self.make_psf_monochromatic(phase=phase0_fit,return_psf=True)*results.x[0]
+		tmppsf_raw = self.make_psf(phase=phase0_fit,return_psf=True)*results.x[0]
+
 		self.bestfit_maps['map0'] = tmppsf_raw
 
 		# phase1_fit = self.make_phase(c=c_bestfit_map1,secondary_offset=results.x[4],del_x=results.x[3],del_y=results.x[4],del_alph_x=0.,del_alph_y=0.,
 		# 						  f=results.x[1],F=525.,D=50.)
 		phase1_fit = self.make_phase(c=c_bestfit_map1,secondary_offset=results.x[1]+secondary_throw_array[1],del_x=0.,del_y=0.,del_alph_x=0,del_alph_y=0,
 								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			tmppsf_raw = self.make_psf(phase=phase1_fit,return_psf=True)*results.x[0]
-		else:
-			tmppsf_raw = self.make_psf_monochromatic(phase=phase1_fit,return_psf=True)*results.x[0]
+
+		tmppsf_raw = self.make_psf(phase=phase1_fit,return_psf=True)*results.x[0]
+
 		self.bestfit_maps['map1'] = tmppsf_raw
 
 		# phase2_fit = self.make_phase(c=c_bestfit_map2,secondary_offset=results.x[4]+1.E-3,del_x=results.x[3],del_y=results.x[4],del_alph_x=0.,del_alph_y=0.,
 		# 						  f=results.x[1],F=525.,D=50.)
 		phase2_fit = self.make_phase(c=c_bestfit_map2,secondary_offset=results.x[1]+secondary_throw_array[2],del_x=0.,del_y=0.,del_alph_x=0,del_alph_y=0,
 								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			tmppsf_raw = self.make_psf(phase=phase2_fit,return_psf=True)*results.x[0]
-		else:
-			tmppsf_raw = self.make_psf_monochromatic(phase=phase2_fit,return_psf=True)*results.x[0]
+		tmppsf_raw = self.make_psf(phase=phase2_fit,return_psf=True)*results.x[0]
+
 		self.bestfit_maps['map2'] = tmppsf_raw
 
 
 		self.zern_coefficients = c_bestfit_ideal
-		
-		Phi = np.zeros([self.zernike_polynomials.shape[1],self.zernike_polynomials.shape[2]])
-		for i in range(c_bestfit_ideal.size):
-			Phi+=c_bestfit_ideal[i]*self.zernike_polynomials[i,:,:]
 
-		phase_ideal_fit = Phi
-		self.phase = phase_ideal_fit
 		
-		A_complex = self.Aperture*self.illumination*np.exp(phase_ideal_fit*1j)
-		angular_width,U = Fraunhofer(A_complex,self.wavelength,self.delta_x)
-		PSF,PSF_dB = Convert_field_to_PSF(U)
-		tmppsf_raw = enmap.enmap(results.x[0]*(PSF/self.normalizing_amplitude_monochromatic),wcs=self.newmapwcs['map0'])
+		phase_ideal = self.make_phase(c=c_bestfit_ideal,secondary_offset=0.,del_x=0.,del_y=0.,del_alph_x=0,del_alph_y=0,
+								  f=17.5,F=525.,D=50.)
+		tmppsf_raw = self.make_psf(phase=phase_ideal,return_psf=True)*results.x[0]
 		gain_loss = np.amax(tmppsf_raw/results.x[0])
 		self.gain_loss = gain_loss
 
@@ -2923,271 +2764,3 @@ class Fraunhofer_Beamfit:
 		self.results_dict = results_dict
 		print('Made results dict')
 
-
-	def function2minimize_nocoma(self,x,secondary_throw_array):
-
-		"""
-		Objective function for beam model fitting.
-
-		Parameters
-		----------
-		x : array-like
-			Fit parameter vector including source amplitude, tilts, defocus,
-			and Zernike coefficients.
-
-		Returns
-		-------
-		float
-			RMS residuals across maps 0, 1, and 2 combined.
-		"""
-
-		#list of fit params
-		# x[0] = source amplitude
-		# x[1] = M2.X offset
-		# x[2] = M2.Y offset
-		# x[3] = M2.Z offset
-
-		# x[4] = TILT_Y
-		# x[5] = TILT_X
-
-		# x[6] = AST_O
-		# x[7] = AST_V
-		# x[8] = TRE_V
-		# x[9] = TRE_O
-		# x[10] = QUAD_O
-
-		
-		# make map 0 zern params
-
-
-		c_map0 = np.zeros(self.zernike_polynomials.shape[0])
-		c_map0[1] = x[4] # TILT_Y is always 0
-		c_map0[2] = x[5] # TILT_X is always 0
-		c_map0[3] = x[6]
-		c_map0[5] = x[7]
-		c_map0[6] = x[8]
-		c_map0[9:] = x[9:]
-
-		# make map 1 zern params
-
-		c_map1 = np.zeros(self.zernike_polynomials.shape[0])
-		c_map1[1] = x[4] # TILT_Y is always 0
-		c_map1[2] = x[5] # TILT_X is always 0
-		c_map1[3] = x[6]
-		c_map1[5] = x[7]
-		c_map1[6] = x[8]
-		c_map1[9:] = x[9:]
-
-		# make map 2 zern params
-
-		c_map2 = np.zeros(self.zernike_polynomials.shape[0])
-		c_map2[1] = x[4] # TILT_Y is always 0
-		c_map2[2] = x[5] # TILT_X is always 0
-		c_map2[3] = x[6]
-		c_map2[5] = x[7]
-		c_map2[6] = x[8]
-		c_map2[9:] = x[9:]
-
-
-
-		# make map 0 psf
-	
-
-		# phase0 = self.make_phase(c=c_map0,secondary_offset=x[4]-1.E-3,del_x=x[2],del_y=x[3],del_alph_x=0.,del_alph_y=0.,
-		# 						  f=x[1],F=525.,D=50.)
-
-		phase0 = self.make_phase(c=c_map0,secondary_offset=x[3]+secondary_throw_array[0],del_x=x[1],del_y=x[2],del_alph_x=0.,del_alph_y=0.,
-								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			model_map0 = self.make_psf(phase=phase0,return_psf=True)*x[0]
-		else:
-			model_map0 = self.make_psf_monochromatic(phase=phase0,return_psf=True)*x[0]
-		resids_map0 = self.trunc_maps['map0'] - model_map0
-		rms_map0 = np.sqrt(np.mean(resids_map0**2))
-
-		# make map 1 psf
-	
-		# phase1 = self.make_phase(c=c_map1,secondary_offset=x[4],del_x=x[3],del_y=x[4],del_alph_x=0.,del_alph_y=0.,
-		# 						  f=x[1],F=525.,D=50.)
-		phase1 = self.make_phase(c=c_map1,secondary_offset=x[3]+secondary_throw_array[1],del_x=x[1],del_y=x[2],del_alph_x=0.,del_alph_y=0.,
-								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			model_map1 = self.make_psf(phase=phase1,return_psf=True)*x[0]
-		else:
-			model_map1 = self.make_psf_monochromatic(phase=phase1,return_psf=True)*x[0]
-		
-		resids_map1 = self.trunc_maps['map1'] - model_map1
-		rms_map1 = np.sqrt(np.mean(resids_map1**2))
-
-		# make map 2 psf
-	
-		# phase2 = self.make_phase(c=c_map2,secondary_offset=x[4]+1E-3,del_x=x[3],del_y=x[4],del_alph_x=0.,del_alph_y=0.,
-		# 						  f=x[1],F=525.,D=50.)
-		phase2 = self.make_phase(c=c_map2,secondary_offset=x[3]+secondary_throw_array[2],del_x=x[1],del_y=x[2],del_alph_x=0.,del_alph_y=0.,
-								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			model_map2 = self.make_psf(phase=phase2,return_psf=True)*x[0]
-		else:
-			model_map2 = self.make_psf_monochromatic(phase=phase2,return_psf=True)*x[0]
-		
-		resids_map2 = self.trunc_maps['map2'] - model_map2
-		rms_map2 = np.sqrt(np.mean(resids_map2**2))
-	
-		
-		chisquare = np.sqrt(rms_map0**2+rms_map1**2+rms_map2**2)
-		self.cost = np.sum(chisquare)
-		self.fit_step_counter+=1
-		if self.fit_step_counter%500==0:
-			print('On fit step ',self.fit_step_counter,' with cost ',np.sum(chisquare))
-			#self.quick_plot_results(model_map0,model_map1,model_map2,plot_vmin=-500,plot_vmax=500.,resids_vmin=None,resids_vmax=None,save_fig_name=None,noshow=False,plot_title=None,lowerleft=[-0.75/60,-0.75/60.],upperright=[0.75/60,0.75/60.])
-		return chisquare
-		
-	def fit_beam_nocoma(self,c_guess=None,secondary_throw_array=[-1E-3,0,1E-3],boundvals = None,fit_achromatic_beam=False):
-
-		"""
-		Fit the beam model to the input maps by optimizing Zernike phase terms
-		and geometric defocus.
-
-		Parameters
-		----------
-		c_guess : array-like, optional
-			Initial guess for Zernike coefficients.
-		boundvals : list of tuples
-			Bounds for optimization variables, passed to scipy.optimize.minimize.
-		"""
-
-		#list of fit params
-		# x[0] = source amplitude
-		# x[1] = M2.X offset
-		# x[2] = M2.Y offset
-		# x[3] = M2.Z offset
-
-		# x[4] = TILT_Y
-		# x[5] = TILT_X
-
-		# x[6] = AST_O
-		# x[7] = AST_V
-		# x[8] = TRE_V
-		# x[9] = TRE_O
-		# x[10] = QUAD_O
-
-		self.achro_beam_fit = fit_achromatic_beam
-
-
-		x0 = np.zeros(self.zernike_polynomials.shape[0]) # need to make an array that has the zernike coeffs plus 1 for theta0
-		x0[0] = np.amax(self.trunc_maps['map1'])
-		x0[1] = 17.5 # guess for primary focal length
-		
-		if c_guess is not None:
-			x0[8:] = c_guess
-		
-		self.fit_step_counter = 0
-		results = minimize(self.function2minimize_nocoma,x0,args=secondary_throw_array,bounds=boundvals)
-		self.results = results
-		if results.success:
-			print('The fit was successful. Cost =', self.cost)
-		else:
-			print('The fit was not successful, you may need to run again with different guess or bounds. Cost =', self.cost)
-		#self.make_zernike_results_dict()
-
-		c_bestfit_map0 = np.zeros(self.zernike_polynomials.shape[0])
-		c_bestfit_map0[1] = results.x[4]
-		c_bestfit_map0[2] = results.x[5]
-		c_bestfit_map0[3] = results.x[6]
-		c_bestfit_map0[5] = results.x[7]
-		c_bestfit_map0[6] = results.x[8]
-		c_bestfit_map0[9:] = results.x[9:]
-
-
-		c_bestfit_map1 = np.zeros(self.zernike_polynomials.shape[0])
-		c_bestfit_map1[1] = results.x[4]
-		c_bestfit_map1[2] = results.x[5]
-		c_bestfit_map1[3] = results.x[6]
-		c_bestfit_map1[5] = results.x[7]
-		c_bestfit_map1[6] = results.x[8]
-		c_bestfit_map1[9:] = results.x[9:]
-
-		c_bestfit_map2 = np.zeros(self.zernike_polynomials.shape[0])
-		c_bestfit_map2[1] = results.x[4]
-		c_bestfit_map2[2] = results.x[5]
-		c_bestfit_map2[3] = results.x[6]
-		c_bestfit_map2[5] = results.x[7]
-		c_bestfit_map2[6] = results.x[8]
-		c_bestfit_map2[9:] = results.x[9:]
-
-		c_bestfit_ideal = np.zeros(self.zernike_polynomials.shape[0])
-		c_bestfit_ideal[3] = results.x[6]
-		c_bestfit_ideal[5] = results.x[7]
-		c_bestfit_ideal[6] = results.x[8]
-		c_bestfit_ideal[9:] = results.x[9:]
-
-		# make bestfitmaps for resids
-		self.bestfit_maps = {}
-
-		# phase0_fit = self.make_phase(c=c_bestfit_map0,secondary_offset=results.x[4]-1.E-3,del_x=results.x[3],del_y=results.x[4],del_alph_x=0.,del_alph_y=0.,
-		# 						  f=results.x[1],F=525.,D=50.)
-		phase0_fit = self.make_phase(c=c_bestfit_map0,secondary_offset=results.x[3]+secondary_throw_array[0],del_x=results.x[1],del_y=results.x[2],del_alph_x=0.,del_alph_y=0.,
-								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			tmppsf_raw = self.make_psf(phase=phase0_fit,return_psf=True)*results.x[0]
-
-		else:
-			tmppsf_raw = self.make_psf_monochromatic(phase=phase0_fit,return_psf=True)*results.x[0]
-		self.bestfit_maps['map0'] = tmppsf_raw
-
-		# phase1_fit = self.make_phase(c=c_bestfit_map1,secondary_offset=results.x[4],del_x=results.x[3],del_y=results.x[4],del_alph_x=0.,del_alph_y=0.,
-		# 						  f=results.x[1],F=525.,D=50.)
-		phase1_fit = self.make_phase(c=c_bestfit_map1,secondary_offset=results.x[3]+secondary_throw_array[1],del_x=results.x[1],del_y=results.x[2],del_alph_x=0.,del_alph_y=0.,
-								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			tmppsf_raw = self.make_psf(phase=phase1_fit,return_psf=True)*results.x[0]
-		else:
-			tmppsf_raw = self.make_psf_monochromatic(phase=phase1_fit,return_psf=True)*results.x[0]
-		self.bestfit_maps['map1'] = tmppsf_raw
-
-		# phase2_fit = self.make_phase(c=c_bestfit_map2,secondary_offset=results.x[4]+1.E-3,del_x=results.x[3],del_y=results.x[4],del_alph_x=0.,del_alph_y=0.,
-		# 						  f=results.x[1],F=525.,D=50.)
-		phase2_fit = self.make_phase(c=c_bestfit_map2,secondary_offset=results.x[3]+secondary_throw_array[2],del_x=results.x[1],del_y=results.x[2],del_alph_x=0.,del_alph_y=0.,
-								  f=17.5,F=525.,D=50.)
-		if self.achro_beam_fit:
-			tmppsf_raw = self.make_psf(phase=phase2_fit,return_psf=True)*results.x[0]
-		else:
-			tmppsf_raw = self.make_psf_monochromatic(phase=phase2_fit,return_psf=True)*results.x[0]
-		self.bestfit_maps['map2'] = tmppsf_raw
-
-
-		self.zern_coefficients = c_bestfit_ideal
-		
-		Phi = np.zeros([self.zernike_polynomials.shape[1],self.zernike_polynomials.shape[2]])
-		for i in range(c_bestfit_ideal.size):
-			Phi+=c_bestfit_ideal[i]*self.zernike_polynomials[i,:,:]
-
-		phase_ideal_fit = Phi
-		self.phase = phase_ideal_fit
-		
-		A_complex = self.Aperture*self.illumination*np.exp(phase_ideal_fit*1j)
-		angular_width,U = Fraunhofer(A_complex,self.wavelength,self.delta_x)
-		PSF,PSF_dB = Convert_field_to_PSF(U)
-		tmppsf_raw = enmap.enmap(results.x[0]*(PSF/self.normalizing_amplitude_monochromatic),wcs=self.newmapwcs['map0'])
-		gain_loss = np.amax(tmppsf_raw/results.x[0])
-		self.gain_loss = gain_loss
-
-		self.bestfitbeam = tmppsf_raw
-		self.make_zernike_results_dict_nocoma()
-
-	def make_zernike_results_dict_nocoma(self):
-		zernike_labels = np.array(['amp','M2.X_offset','M2.Y_offset','M2.Z_offset',
-			                       'Y_Tilt','X_Tilt',
-			                       'AST_O', 'AST_V',
-			                       'TRE_V', 'TRE_O',
-			                       'QUAD_O','SPH', 'QUAD_V', 
-			                       'AST2_V', 'AST2_O'])
-		zernike_values = self.results.x[:]
-
-		zernike_dict = {
-			'labels': zernike_labels.tolist(),  # Convert NumPy array to list
-			'values': zernike_values.tolist()   # Convert NumPy array to list
-		}
-
-		self.results_dict = zernike_dict
-		print('Made Results dict')
