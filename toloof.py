@@ -34,6 +34,7 @@ class CitlaliMaps:
 		self.primary_header = fitsfile[0].header
 		
 		self.maps = {}
+		self.headers = {}
 		
 		for i, hdu in enumerate(fitsfile):
 			# Check if there is data in the HDU (it might be None for non-image extensions)
@@ -65,6 +66,7 @@ class CitlaliMaps:
 					tmpenmap = enmap.enmap(hdu.data[:,:],wcs=WCS(header=hdu.header))
 				
 				self.maps[key] = tmpenmap
+				self.headers[key] = tmpheader
 		fitsfile.close()
 
 	def convert_signalmap_to_MJypersr(self, array_name, map_key='signal_I'):
@@ -539,7 +541,7 @@ def zernike_poly(n,m,rho,phi):
 	elif m>0:
 		angular_part = np.cos(m*phi)
 	elif m<0:
-		angular_part = -np.sin(m*phi)
+		angular_part = np.sin(m*phi)#-np.sin(m*phi)
 	tmpzern = radial_part*angular_part
 	tmpzern[np.where(rho>0.9999)] = 0
 	return tmpzern*zern_normalization(n,m)
@@ -752,7 +754,7 @@ class Fraunhofer_Image:
 		primaryaperture = np.ones(self.y.shape)
 		primaryaperture[self.r>primary_diamter/2.] = 0.
 
-		secondarydiameter = 2.5
+		secondarydiameter = 2.*1.625 #2.5
 		secondaryblockage = np.ones(self.y.shape)
 		secondaryblockage[self.r<secondarydiameter/2.] = 0.
 
@@ -2239,7 +2241,7 @@ class Fraunhofer_Beamfit:
 		return chisquare
 		
 	def fit_beam_with_pointing_offsets(self,c_guess=None,secondary_throw_array=[-1E-3,0,1E-3],boundvals = None,fit_achromatic_beam=False):
-
+		print('RUNNING fit_beam_with_pointing_offsets')
 		"""
 		Fit the beam model to the input maps by optimizing Zernike phase terms
 		and geometric defocus.
