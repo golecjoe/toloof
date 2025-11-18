@@ -630,7 +630,7 @@ def gen_defocus_cassegrain_telescope(r,dz,f=17.5,F=525.,D=50.):
 	"""
 	a = r/(2.*f)
 	b = r/(2.*F)
-	tmpdefocus = dz*(((1-a**2)/(1+a**2))+((1-b**2)/(1+b**2)))
+	tmpdefocus = -dz*(((1-a**2)/(1+a**2))+((1-b**2)/(1+b**2)))
 	tmpdefocus[np.where(r>(D/2.))]=0
 	return tmpdefocus
 
