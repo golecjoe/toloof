@@ -10,123 +10,21 @@ from telfile_io import get_M2z_from_tel
 from optics import gaussian, gen_zernike_polys,gen_defocus_cassegrain_telescope,gen_phase_error_secondary_lat_displacement,gen_phase_error_secondary_tilt
 from diffraction import Fraunhofer, Convert_field_to_PSF
 
-class Beam:
-	"""
-	A class to model and fit far-field beam patterns using Fraunhofer diffraction,
-	Zernike polynomials, and real input maps (e.g., from TolTEC/Citlali).
 
-	This class supports the simulation of PSFs through aperture illumination,
-	phase aberrations, and Cassegrain defocus, and fits observed beam maps
-	to recover surface errors and misalignments.
+class SimBeam:
+	def __init__(self,wavelengths,pixelsize,imagesize,bandpass=None):
 
-	Parameters
-	----------
-	paths2files : list of str
-		List of FITS file paths to beam maps.
-	wavelength : float
-		Observing wavelength in meters.
-	mask_radius : float, optional
-		Radius (in degrees) of the mask used to isolate the beam (default: 2 arcmin).
-	map_center : list of float, optional
-		[RA, Dec] of the map center in degrees (default: [0., 0.]).
-	padpixels : int, optional
-		Number of pixels to pad maps before beam truncation.
-	inputfitsfileformat : str, optional
-		Format of input FITS files. Currently supports 'citlali'.
-	"""
-	def __init__(self,paths2files,paths2telfiles,
-		         wavelengths,bandpass=None,
-		         mask_radius=1.5/60.,map_center = [0.,0.],padpixels = None):
-		
-		# this class fits one wavelength at a time
-			
 		self.wavelengths = wavelengths
+		self.pixelsize = pixelsize
+		self.N = int(imagesize/pixelsize)
+		self.delta_x = np.mean(wavelengths)/np.deg2rad(pixelsize*self.N)
+
+		self.model_map_wcs = wcsutils.build((0,0),res=pixelsize, shape=[self.N,self.N], system='tan')
 
 		if bandpass is None:
 			self.bandpass = np.ones(wavelengths.size)
 		else:
 			self.bandpass = bandpass
-		
-		self.surface_error = {}
-		
-		#load in the maps 
-		#only make this work with citlali maps
-		tmpmapdict = {}
-		signalmaps = {}
-		for i,path in enumerate(paths2files):
-			tmpmap = CitlaliMaps(path)
-			tmpmapdict['map'+str(i)] = tmpmap
-			signalmaps['map'+str(i)] = tmpmap.maps['signal_I']
-		m2z_vals = {}
-		for i,path in enumerate(paths2telfiles):
-			m2z_vals['map'+str(i)] = get_M2z_from_tel(path)*1E-3
-		self.m2z_vals = m2z_vals
-
-		for i in signalmaps:
-			tmpmap = signalmaps[i]
-			if tmpmap.wcs.wcs.ctype[0]=='AZOFFSET':
-				tmpmap.wcs.wcs.ctype[0] = 'RA---TAN'
-				tmpmap.wcs.wcs.cdelt[0] = tmpmap.wcs.wcs.cdelt[0]/3600.
-				tmpmap.wcs.wcs.cunit[0] = 'deg'
-			if tmpmap.wcs.wcs.ctype[1]=='ELOFFSET':
-				tmpmap.wcs.wcs.ctype[1] = 'DEC--TAN'
-				tmpmap.wcs.wcs.cdelt[1] = tmpmap.wcs.wcs.cdelt[1]/3600.
-				tmpmap.wcs.wcs.cunit[1] = 'deg'
-			signalmaps[i] = tmpmap
-
-		for i in signalmaps:
-			tmpmap = signalmaps[i]
-			tmpmapproj = enmap.project(tmpmap,signalmaps['map0'].shape,signalmaps['map0'].wcs)
-			signalmaps[i] = tmpmapproj
-
-		for i in signalmaps:
-			tmpmap = signalmaps[i]
-			if padpixels is not None:
-				tmpmap = enmap.pad(tmpmap,padpixels)
-			signalmaps[i] = tmpmap
-
-		
-		self.original_maps = signalmaps
-
-		tmpmapload = signalmaps['map0']
-		self.map_center = SkyCoord(ra=map_center[0]*u.deg,dec=map_center[1]*u.deg)
-		map_mask_tmp= make_mask_enmap(tmpmapload,mask_radius,centervals = map_center,apod_width = None)
-		self.map_mask = map_mask_tmp
-
-	def truncate_maps(self,desired_deltax_size,center_on_brightest_pix=False):
-		"""
-		Truncate the input maps to a square region around the beam center.
-
-		Parameters
-		----------
-		desired_deltax_size : float
-			Physical size (in wavelengths) to use for truncation box.
-		center_on_brightest_pix : bool, optional
-			Whether to center cutout on peak pixel or map center.
-		"""
-		self.newmapwcs = {}
-		self.trunc_maps = {}
-		self.peak_pixel = {}
-		self.N = {}
-		self.delta_x = desired_deltax_size
-		#mapsize = int(wavelength/(np.deg2rad(self.trunc_map.wcs.wcs.cdelt[1])*desired_deltax_size))
-		
-		for i in self.original_maps:
-
-			masked_map = self.original_maps[i]*self.map_mask
-			brightestpix = np.where(masked_map==np.amax(masked_map))
-			self.peak_pixel[i] = np.amax(masked_map)
-			N_tmp = int(np.mean(self.wavelengths)/(np.deg2rad(abs(self.original_maps[i].wcs.wcs.cdelt[1]))*desired_deltax_size))
-			self.N[i] = N_tmp
-			if center_on_brightest_pix:
-				tmpcoords = enmap.pix2sky(masked_map.shape, masked_map.wcs, brightestpix)
-				center_skycoord = SkyCoord(ra=tmpcoords[1]*u.rad,dec=tmpcoords[0]*u.rad)
-			else:
-				center_skycoord = self.map_center
-
-			tmp = Cutout2D(masked_map, center_skycoord, [N_tmp,N_tmp], wcs=masked_map.wcs)
-			self.newmapwcs[i] = tmp.wcs
-			self.trunc_maps[i] = enmap.enmap(tmp.data,wcs=tmp.wcs)
 
 	def set_LMT_aperture(self,include_legs=True,plot_aperture=False,save_aperture=None):
 		"""
@@ -142,13 +40,10 @@ class Beam:
 		
 		delta_x = self.delta_x
 		#print('The Pixel Size in the Aperture Plane is ',delta_x, ' meters')
-		L = self.N['map0']*delta_x
-		diam_primary = 50. ## the diameter of the primary in meters
-		diam_secondary = 2.5 # diameter of the secondary in meters
-		legwidths = 0.5#0.125 # quadrupod leg width in meters
-		quadrupod_diam = 31. # diameter of circle defined by secondary suport
+		L = self.N*delta_x
+
 		###  make the coordinate grid
-		x,y,r,phi = make_coordinate_grids(self.N['map0'],L)
+		x,y,r,phi = make_coordinate_grids(self.N,L)
 
 		self.x = x
 		self.y = y
@@ -232,6 +127,7 @@ class Beam:
 				plt.savefig(save_aperture,bbox_inches='tight')
 			plt.close()
 
+
 	def set_illumination(self,aperture_fwhm = 48.,edge_taper_diameter=48.,plot_illumination=False):
 		"""
 		Define a radial Gaussian illumination function over the aperture.
@@ -247,7 +143,7 @@ class Beam:
 		"""
 
 		sig0 = aperture_fwhm/(2*np.sqrt(2*np.log(2)))
-		edge_taper = np.ones([self.N['map0'],self.N['map0']])
+		edge_taper = np.ones([self.N,self.N])
 		edge_taper[np.where(self.r>edge_taper_diameter/2.)]=0
 		illumination = gaussian(self.r,sig0)*edge_taper
 		self.illumination = illumination
@@ -333,7 +229,7 @@ class Beam:
 
 		PSF = enmap.enmap(PSF,tmpnewwcs)
 
-		PSF_proj = enmap.project(PSF,self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs)
+		PSF_proj = enmap.project(PSF,(self.N,self.N),self.model_map_wcs)
 
 		return PSF_proj
 
@@ -357,7 +253,7 @@ class Beam:
 
 		else:
 			delta_wavelengths = np.diff(self.wavelengths)
-			total_psf = enmap.zeros(self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs)
+			total_psf = enmap.zeros((self.N,self.N),self.model_map_wcs)
 			BP_denom = 0
 
 			for i in range(len(self.wavelengths)-1):
@@ -388,7 +284,7 @@ class Beam:
 
 		else:
 			delta_wavelengths = np.diff(self.wavelengths)
-			total_psf = enmap.zeros(self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs)
+			total_psf = enmap.zeros((self.N,self.N),self.model_map_wcs)
 			BP_denom = 0
 
 			for i in range(len(self.wavelengths)-1):
@@ -403,20 +299,14 @@ class Beam:
 			PSF_BP = total_psf/BP_denom
 			self.norm_amplitude = np.amax(PSF_BP)
 
-						
-
-
 	def initialize_model(self,
-						aperture_plane_resolution = 1.,center_on_brightest_pix=False,
 						include_legs=True,plot_aperture=False,save_aperture=None,
 						aperture_fwhm = 48.,edge_taper_diameter=48.,plot_illumination=False,
 						n=4,m=4):
-		self.truncate_maps(aperture_plane_resolution,center_on_brightest_pix=center_on_brightest_pix)
+
 		self.set_LMT_aperture(include_legs=include_legs,plot_aperture=plot_aperture,save_aperture=save_aperture)
 		self.set_illumination(aperture_fwhm = aperture_fwhm,edge_taper_diameter=edge_taper_diameter,plot_illumination=plot_illumination)
 		self.get_zernike_polynomials(n,m)
 		self.make_normalizing_amplitude()
-
-
 
 
