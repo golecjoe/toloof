@@ -108,7 +108,7 @@ class fit_beam_with_pointing_offsets:
 
 
 def plot_fit_results(beamclass,fitclass,results,vmax_frac_of_source_flux = 0.2,resids_stretch=5,
-	                 title=None,savefigname=None):
+	                 title=None,savefigname=None,showplot=False):
 
 	plt.figure(figsize=(15,8))
 	# plt.figure()
@@ -227,7 +227,11 @@ def plot_fit_results(beamclass,fitclass,results,vmax_frac_of_source_flux = 0.2,r
 	plt.suptitle(title)
 	if savefigname is not None:
 		plt.savefig(savefigname,bbox_inches='tight')
-	plt.show()
+
+	if showplot:
+		plt.show()
+	else:
+		plt.close()
 
 
 def save_results(results,fitclass,savefilename):
