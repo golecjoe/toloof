@@ -49,13 +49,12 @@ tmpfitclass = fit_beam_with_pointing_offsets(tmpclass)
 
 results = minimize(tmpfitclass.chisquared,x0=tmpfitclass.x0)
 
-print(results.x[tmpfitclass.tilt_offset_end_index:]*(np.mean(test_wavelengths)*1E6)/(2.*np.pi*np.sqrt(2)))
-
 t2 = time.time()
 
 print('Time it took = ',t2-t1, ' seconds')
 
-plot_fit_results(tmpclass,tmpfitclass,results,vmax_frac_of_source_flux = 0.2,title='test title')
+plot_fit_results(tmpclass,tmpfitclass,results,vmax_frac_of_source_flux = 0.2,
+	             title='test title',savefigname='testfig.png')
 
 save_results(results,tmpfitclass,'test_results.json')
 

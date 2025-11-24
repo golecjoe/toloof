@@ -107,7 +107,8 @@ class fit_beam_with_pointing_offsets:
 		return np.sqrt(chi_squared)
 
 
-def plot_fit_results(beamclass,fitclass,results,vmax_frac_of_source_flux = 0.2,resids_stretch=5,title=None):
+def plot_fit_results(beamclass,fitclass,results,vmax_frac_of_source_flux = 0.2,resids_stretch=5,
+	                 title=None,savefigname=None):
 
 	plt.figure(figsize=(15,8))
 	# plt.figure()
@@ -224,6 +225,8 @@ def plot_fit_results(beamclass,fitclass,results,vmax_frac_of_source_flux = 0.2,r
 			va='center', ha='right', fontsize=14
 		)
 	plt.suptitle(title)
+	if savefigname is not None:
+		plt.savefig(savefigname,bbox_inches='tight')
 	plt.show()
 
 
