@@ -104,6 +104,9 @@ class fit_beam_with_pointing_offsets:
 			chi_squared+= np.mean(residual**2)
 		self.fitting_counter+=1
 		self.temp_cost = chi_squared
+		self.strehl_ratio = np.amax(self.tmpbeamclass.make_psf(c=ctmp,secondary_offset=0,
+							   del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
+							   f=17.5,F=525.,D=50.))
 		return np.sqrt(chi_squared)
 
 
@@ -239,6 +242,7 @@ def save_results(results,fitclass,savefilename):
 	results_dict = {}
 	results_dict['source_amp'] = results.x[0]
 	results_dict['M2.Z_offset'] = results.x[1]
+	results_dict['strehl_ratio'] = fitclass.strehl_ratio
 	map_counter = 0
 	tmpind = fitclass.tilt_offset_start_index
 	while tmpind<fitclass.tilt_offset_end_index:

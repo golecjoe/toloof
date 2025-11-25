@@ -13,7 +13,7 @@ import time
 
 t1 = time.time()
 
-test_freqs = np.array([150.]) #np.linspace(125,175,5)
+test_freqs = np.linspace(125,175,5)#np.array([150.]) #np.linspace(125,175,5)
 test_wavelengths = 300.E-3/test_freqs
 
 toltec_bandpass = np.load(os.path.expanduser('~/Documents/Work/TolTEC/toloof/model_passbands.npz'))
@@ -36,11 +36,11 @@ for i in obsnums:
 	tel_file_paths.append(tmp_tel_path[0])
 
 
-tmpclass = Beam(map_file_paths,tel_file_paths,test_wavelengths,bandpass=None)
+tmpclass = Beam(map_file_paths,tel_file_paths,test_wavelengths,bandpass=tmp_BP)
 
 tmpclass.initialize_model(aperture_plane_resolution = 1.0,center_on_brightest_pix=False,
 						  include_legs=True,plot_aperture=False,save_aperture=None,
-						  aperture_fwhm = 43.,edge_taper_diameter=43.,plot_illumination=False,
+						  aperture_fwhm = 48.,edge_taper_diameter=48.,plot_illumination=False,
 						  n=5,m=5)
 
 
@@ -54,7 +54,7 @@ t2 = time.time()
 print('Time it took = ',t2-t1, ' seconds')
 
 plot_fit_results(tmpclass,tmpfitclass,results,vmax_frac_of_source_flux = 0.2,
-	             title='test title',savefigname='testfig.png')
+	             title='test title',savefigname='testfig_BP.png')
 
-save_results(results,tmpfitclass,'test_results.json')
+save_results(results,tmpfitclass,'test_results_BP.json')
 
