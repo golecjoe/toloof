@@ -398,7 +398,7 @@ class fit_beam_with_M2_offsets:
 			if (subplotcounter)%self.number_of_maps!=1:
 				plt.yticks([])
 			subplotcounter+=1
-		tilt_counter = 0
+		tilt_counter = self.tilt_offset_start_index
 		for count,i in enumerate(self.tmpbeamclass.trunc_maps):
 			plt.subplot(3,self.number_of_maps,subplotcounter)
 			ctmp = np.zeros(self.tmpbeamclass.zernike_polynomials.shape[0])
@@ -424,7 +424,7 @@ class fit_beam_with_M2_offsets:
 			if (subplotcounter)%self.number_of_maps!=1:
 				plt.yticks([])
 			subplotcounter+=1
-		tilt_counter = 0
+		tilt_counter = self.tilt_offset_start_index
 		for count,i in enumerate((self.tmpbeamclass.trunc_maps)):
 			plt.subplot(3,self.number_of_maps,subplotcounter)
 			ctmp = np.zeros(self.tmpbeamclass.zernike_polynomials.shape[0])
