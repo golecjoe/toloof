@@ -6,14 +6,14 @@ from pixell import enmap, enplot, reproject, utils, curvedsky,wcsutils
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
-from fitbeam import fit_beam_with_pointing_offsets, plot_fit_results,save_results
+from fitbeam import fit_beam_with_pointing_offsets, plot_fit_results,save_results,fit_beam_with_M2_offsets
 from scipy.optimize import minimize
 
 import time
 
 t1 = time.time()
 
-test_freqs = np.linspace(125,175,5)#np.array([150.]) #np.linspace(125,175,5)
+test_freqs = np.array([150.]) #np.linspace(125,175,5)
 test_wavelengths = 300.E-3/test_freqs
 
 toltec_bandpass = np.load(os.path.expanduser('~/Documents/Work/TolTEC/toloof/model_passbands.npz'))
@@ -36,25 +36,27 @@ for i in obsnums:
 	tel_file_paths.append(tmp_tel_path[0])
 
 
-tmpclass = Beam(map_file_paths,tel_file_paths,test_wavelengths,bandpass=tmp_BP)
+tmpclass = Beam(map_file_paths,tel_file_paths,test_wavelengths,bandpass=None)
 
-tmpclass.initialize_model(aperture_plane_resolution = 1.0,center_on_brightest_pix=False,
+tmpclass.initialize_model(aperture_plane_resolution = 1.0,center_on_brightest_pix=True,
 						  include_legs=True,plot_aperture=False,save_aperture=None,
-						  aperture_fwhm = 48.,edge_taper_diameter=48.,plot_illumination=False,
-						  n=5,m=5)
+						  aperture_fwhm = 45.,edge_taper_diameter=45.,plot_illumination=False,
+						  n=4,m=4)
 
 
-tmpfitclass = fit_beam_with_pointing_offsets(tmpclass)
+# tmpfitclass = fit_beam_with_pointing_offsets(tmpclass)
 
-
-results = minimize(tmpfitclass.chisquared,x0=tmpfitclass.x0)
+tmpfitclass = fit_beam_with_M2_offsets(tmpclass)
+tmpfitclass.run_fitter()
+tmpfitclass.plot_fit_results(savefigname='m2test.png')
+tmpfitclass.save_results('m2testresults.json')
 
 t2 = time.time()
 
 print('Time it took = ',t2-t1, ' seconds')
 
-plot_fit_results(tmpclass,tmpfitclass,results,vmax_frac_of_source_flux = 0.2,
-	             title='test title',savefigname='testfig_BP.png')
+# plot_fit_results(tmpclass,tmpfitclass,results,vmax_frac_of_source_flux = 0.2,
+# 	             title='test title',savefigname='testfig_BP.png')
 
-save_results(results,tmpfitclass,'test_results_BP.json')
+# save_results(results,tmpfitclass,'test_results_BP.json')
 

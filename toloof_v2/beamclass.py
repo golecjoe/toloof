@@ -107,17 +107,20 @@ class Beam:
 		self.newmapwcs = {}
 		self.trunc_maps = {}
 		self.peak_pixel = {}
-		self.N = {}
+		self.N = int(np.mean(self.wavelengths)/(np.deg2rad(abs(self.original_maps['map0'].wcs.wcs.cdelt[1]))*desired_deltax_size))
+		
 		self.delta_x = desired_deltax_size
 		#mapsize = int(wavelength/(np.deg2rad(self.trunc_map.wcs.wcs.cdelt[1])*desired_deltax_size))
+
+		N_tmp = int(np.mean(self.wavelengths)/(np.deg2rad(abs(self.original_maps['map0'].wcs.wcs.cdelt[1]))*desired_deltax_size))
 		
 		for i in self.original_maps:
 
 			masked_map = self.original_maps[i]*self.map_mask
 			brightestpix = np.where(masked_map==np.amax(masked_map))
 			self.peak_pixel[i] = np.amax(masked_map)
-			N_tmp = int(np.mean(self.wavelengths)/(np.deg2rad(abs(self.original_maps[i].wcs.wcs.cdelt[1]))*desired_deltax_size))
-			self.N[i] = N_tmp
+			# N_tmp = int(np.mean(self.wavelengths)/(np.deg2rad(abs(self.original_maps[i].wcs.wcs.cdelt[1]))*desired_deltax_size))
+			# self.N[i] = N_tmp
 			if center_on_brightest_pix:
 				tmpcoords = enmap.pix2sky(masked_map.shape, masked_map.wcs, brightestpix)
 				center_skycoord = SkyCoord(ra=tmpcoords[1]*u.rad,dec=tmpcoords[0]*u.rad)
@@ -142,13 +145,13 @@ class Beam:
 		
 		delta_x = self.delta_x
 		#print('The Pixel Size in the Aperture Plane is ',delta_x, ' meters')
-		L = self.N['map0']*delta_x
+		L = self.N*delta_x
 		diam_primary = 50. ## the diameter of the primary in meters
 		diam_secondary = 2.5 # diameter of the secondary in meters
 		legwidths = 0.5#0.125 # quadrupod leg width in meters
 		quadrupod_diam = 31. # diameter of circle defined by secondary suport
 		###  make the coordinate grid
-		x,y,r,phi = make_coordinate_grids(self.N['map0'],L)
+		x,y,r,phi = make_coordinate_grids(self.N,L)
 
 		self.x = x
 		self.y = y
@@ -247,7 +250,7 @@ class Beam:
 		"""
 
 		sig0 = aperture_fwhm/(2*np.sqrt(2*np.log(2)))
-		edge_taper = np.ones([self.N['map0'],self.N['map0']])
+		edge_taper = np.ones([self.N,self.N])
 		edge_taper[np.where(self.r>edge_taper_diameter/2.)]=0
 		illumination = gaussian(self.r,sig0)*edge_taper
 		self.illumination = illumination
