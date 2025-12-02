@@ -262,6 +262,9 @@ def save_results(results,fitclass,savefilename):
 		results_dict[zernlabel] = val*1E6*(np.mean(fitclass.tmpbeamclass.wavelengths)/(2.*np.pi*np.sqrt(2)))
 	for i in results_dict:
 		print(i+' ', results_dict[i])
+	for key, value in results_dict.items():
+			if isinstance(value, np.ndarray):
+				results_dict[key] = value.tolist()
 	with open(savefilename, "w") as f:
 		json.dump(results_dict, f, indent=4)
 

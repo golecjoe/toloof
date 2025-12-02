@@ -25,7 +25,7 @@ tmp_BP = interpt_BP_f(test_freqs)
 
 #test_freqs = np.linspace(120,170,10)
 
-obsnums = [145085]#[145082, 145083, 145084, 145085, 145086, 145087, 145088]
+obsnums = [145084, 145085, 145086]#[145082, 145083, 145084, 145085, 145086, 145087, 145088]
 
 map_file_paths = []
 tel_file_paths = []
@@ -48,8 +48,8 @@ tmpclass.initialize_model(aperture_plane_resolution = 1.0,center_on_brightest_pi
 
 tmpfitclass = fit_beam_with_M2_offsets(tmpclass)
 tmpfitclass.run_fitter()
-tmpfitclass.plot_fit_results(savefigname='m2test_oneimage.png')
-tmpfitclass.save_results('m2testresults_oneimage.json')
+tmpfitclass.plot_fit_results(savefigname='m2test_3image.png')
+tmpfitclass.save_results('m2testresults_3image.json')
 
 t2 = time.time()
 
