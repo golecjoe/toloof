@@ -6,7 +6,7 @@ from pixell import enmap, enplot, reproject, utils, curvedsky,wcsutils
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
-from fitbeam import fit_beam_with_pointing_offsets, plot_fit_results,save_results,fit_beam_with_M2_offsets
+from fitbeam import fit_beam_with_pointing_offsets, plot_fit_results,save_results,fit_beam_with_M2_offsets,fit_beam_with_pting_offsets
 from scipy.optimize import minimize
 
 import time
@@ -25,7 +25,7 @@ tmp_BP = interpt_BP_f(test_freqs)
 
 #test_freqs = np.linspace(120,170,10)
 
-obsnums = [145084, 145085, 145086]#[145082, 145083, 145084, 145085, 145086, 145087, 145088]
+obsnums = [145082, 145083, 145084, 145085, 145086, 145087, 145088]
 
 map_file_paths = []
 tel_file_paths = []
@@ -38,7 +38,7 @@ for i in obsnums:
 
 tmpclass = Beam(map_file_paths,tel_file_paths,test_wavelengths,bandpass=None)
 
-tmpclass.initialize_model(aperture_plane_resolution = 1.0,center_on_brightest_pix=False,
+tmpclass.initialize_model(aperture_plane_resolution = 0.5,center_on_brightest_pix=False,
 						  include_legs=True,plot_aperture=False,save_aperture=None,
 						  aperture_fwhm = 45.,edge_taper_diameter=45.,plot_illumination=False,
 						  n=4,m=4)
@@ -46,10 +46,16 @@ tmpclass.initialize_model(aperture_plane_resolution = 1.0,center_on_brightest_pi
 
 # tmpfitclass = fit_beam_with_pointing_offsets(tmpclass)
 
-tmpfitclass = fit_beam_with_M2_offsets(tmpclass)
+# tmpfitclass = fit_beam_with_M2_offsets(tmpclass)
+# tmpfitclass.run_fitter()
+# tmpfitclass.plot_fit_results(savefigname='m2test_7image.png')
+# tmpfitclass.save_results('m2testresults_7image.json')
+
+tmpfitclass = fit_beam_with_pting_offsets(tmpclass)
 tmpfitclass.run_fitter()
-tmpfitclass.plot_fit_results(savefigname='m2test_3image.png')
-tmpfitclass.save_results('m2testresults_3image.json')
+tmpfitclass.plot_fit_results(savefigname='new_offset_image.png')
+tmpfitclass.save_results('new_offset_results.json')
+
 
 t2 = time.time()
 
