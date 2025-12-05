@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from pixell import enmap, enplot, reproject, utils, curvedsky,wcsutils
 from scipy.ndimage import rotate
 from astropy.coordinates import SkyCoord 
@@ -35,8 +36,8 @@ class Beam:
 		Format of input FITS files. Currently supports 'citlali'.
 	"""
 	def __init__(self,paths2files,paths2telfiles,
-		         wavelengths,bandpass=None,
-		         mask_radius=1.5/60.,map_center = [0.,0.],padpixels = None):
+				 wavelengths,bandpass=None,
+				 mask_radius=1.5/60.,map_center = [0.,0.],padpixels = None):
 		
 		# this class fits one wavelength at a time
 			
@@ -191,23 +192,23 @@ class Beam:
 		spider_template = np.ones(self.y.shape)
 
 		for i in range(spidershadow_y.size):
-		    spider_template[np.where(np.abs(self.y[:,i])<spidershadow_y[i]),i] = 0
+			spider_template[np.where(np.abs(self.y[:,i])<spidershadow_y[i]),i] = 0
 
 		# theta in degrees; positive = counterclockwise
 		spider_leg1 = rotate(spider_template, angle=45., reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg1 = (spider_leg1 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_leg2 = rotate(spider_template, angle=135., reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg2 = (spider_leg2 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_leg3 = rotate(spider_template, angle=225., reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg3 = (spider_leg3 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_leg4 = rotate(spider_template, angle=315, reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg4 = (spider_leg4 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_legs_total = spider_leg1*spider_leg2*spider_leg3*spider_leg4
@@ -313,8 +314,8 @@ class Beam:
 		return tmpphase
 
 	def make_psf_monochromatic(self,wavelength,c=None,secondary_offset=0.,
-		                       del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
-				               f=17.5,F=525.,D=50.):
+							   del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
+							   f=17.5,F=525.,D=50.):
 		"""
 		Construct the modeled PSF using the current aperture, illumination, and phase.
 		Stores a normalized enmap PSF in `self.PSF`.
@@ -324,8 +325,8 @@ class Beam:
 
 		
 		phase = self.make_phase(wavelength,c=c,secondary_offset=secondary_offset,
-			                    del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
-			                    f=f,F=F,D=D)
+								del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
+								f=f,F=F,D=D)
 
 		A_complex = self.Aperture*self.illumination*np.exp(phase*1j)
 		farfield_im_size, U = Fraunhofer(A_complex,wavelength,self.delta_x)
@@ -341,8 +342,8 @@ class Beam:
 		return PSF_proj
 
 	def make_psf(self,c=None,secondary_offset=0.,
-		                       del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
-				               f=17.5,F=525.,D=50.):
+							   del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
+							   f=17.5,F=525.,D=50.):
 		"""
 		Construct the modeled PSF using the current aperture, illumination, and phase.
 		Stores a normalized enmap PSF in `self.PSF`.
@@ -354,8 +355,8 @@ class Beam:
 
 		if self.wavelengths.size==1:
 			tmppsf = self.make_psf_monochromatic(self.wavelengths[0],c=c,secondary_offset=secondary_offset,
-		                       del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
-				               f=f,F=F,D=D)
+							   del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
+							   f=f,F=F,D=D)
 			return tmppsf/self.norm_amplitude
 
 		else:
@@ -366,11 +367,11 @@ class Beam:
 			for i in range(len(self.wavelengths)-1):
 				wavelength = self.wavelengths[i]
 				phase = self.make_phase(wavelength,c=c,secondary_offset=secondary_offset,
-				                    del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
-				                    f=f,F=F,D=D)
+									del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
+									f=f,F=F,D=D)
 				psf_i = self.make_psf_monochromatic(wavelength,c=c,secondary_offset=secondary_offset,
-		                       del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
-				               f=f,F=F,D=D)
+							   del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
+							   f=f,F=F,D=D)
 				total_psf += delta_wavelengths[i]*self.bandpass[i]*psf_i
 				BP_denom += delta_wavelengths[i]*self.bandpass[i]
 
@@ -386,8 +387,8 @@ class Beam:
 
 		if self.wavelengths.size==1:
 			self.norm_amplitude = np.amax(self.make_psf_monochromatic(self.wavelengths[0],c=None,secondary_offset=0.,
-		                       del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
-				               f=17.5,F=525.,D=50.))
+							   del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
+							   f=17.5,F=525.,D=50.))
 
 		else:
 			delta_wavelengths = np.diff(self.wavelengths)
@@ -397,8 +398,8 @@ class Beam:
 			for i in range(len(self.wavelengths)-1):
 				wavelength = self.wavelengths[i]
 				psf_i = self.make_psf_monochromatic(wavelength,c=None,secondary_offset=0.,
-		                       del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
-				               f=17.5,F=525.,D=50.)
+							   del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
+							   f=17.5,F=525.,D=50.)
 
 				total_psf += delta_wavelengths[i]*self.bandpass[i]*psf_i
 				BP_denom += delta_wavelengths[i]*self.bandpass[i]
