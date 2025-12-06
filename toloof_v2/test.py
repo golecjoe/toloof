@@ -38,7 +38,7 @@ for i in obsnums:
 
 tmpclass = Beam(map_file_paths,tel_file_paths,test_wavelengths,bandpass=None)
 
-tmpclass.initialize_model(aperture_plane_resolution = 0.5,center_on_brightest_pix=False,
+tmpclass.initialize_model(aperture_plane_resolution = 1.0,center_on_brightest_pix=False,
 						  include_legs=True,plot_aperture=False,save_aperture=None,
 						  aperture_fwhm = 45.,edge_taper_diameter=45.,plot_illumination=False,
 						  n=4,m=4)

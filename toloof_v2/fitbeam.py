@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from pixell import enmap, enplot, reproject, utils, curvedsky,wcsutils
 import json
 from scipy.optimize import minimize
+from joblib import Parallel, delayed
 
 
 
@@ -611,6 +612,8 @@ class fit_beam_with_pointing_offsets:
 		self.fitting_counter = 0
 		self.temp_cost = -999
 
+		self.n_jobs = 8
+
 	def chisquared(self,x):
 
 		if self.fitting_counter%500==0:
@@ -621,38 +624,51 @@ class fit_beam_with_pointing_offsets:
 		source_amp = x[0]
 		M2z_offset = x[1]
 
-		tilt_counter = self.tilt_offset_start_index
-		for count,i in enumerate(self.tmpbeamclass.trunc_maps):
+		 # Unpack per-map tilts/offsets up front
+		tilts = x[self.tilt_offset_start_index:self.tilt_offset_end_index].reshape(self.number_of_maps, 2)
+
+		zern = x[self.tilt_offset_end_index:]  # [AST_O, AST_V, TRE_V, ...] for this fitter
+
+		def map_cost(idx, key):
 			ctmp = np.zeros(self.tmpbeamclass.zernike_polynomials.shape[0])
 
-			# ctmp[1] = x[tilt_counter]
-			# tilt_counter+=1
-			# ctmp[2] = x[tilt_counter]
-			# tilt_counter+=1
+			ctmp[3] = zern[0]
+			ctmp[5:] = zern[1:]
 
-			ctmp[3] = x[self.tilt_offset_end_index]
-			ctmp[5:] = x[self.tilt_offset_end_index+1:]
-
-			modelbeam = source_amp*self.tmpbeamclass.make_psf(c=ctmp,secondary_offset=self.tmpbeamclass.m2z_vals[i]+M2z_offset,
-							   del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
-							   f=17.5,F=525.,D=50.)
-
-			az_off_deg = x[tilt_counter]/3600.
-			tilt_counter+=1
-			el_off_deg = x[tilt_counter]/3600.
-			tilt_counter+=1
+			modelbeam = source_amp * self.tmpbeamclass.make_psf(
+				c=ctmp,
+				secondary_offset=self.tmpbeamclass.m2z_vals[key] + M2z_offset,
+				del_x=0.,
+				del_y=0.,
+				del_alph_x=0.0,
+				del_alph_y=0.0,
+				f=17.5,
+				F=525.0,
+				D=50.0,
+			)
+			az_off_deg = tilts[idx, 0]/3600.	
+			el_off_deg = tilts[idx, 1]/3600.
 
 			pix1_offset = el_off_deg/abs(modelbeam.wcs.wcs.cdelt[1])
 			pix2_offset = az_off_deg/abs(modelbeam.wcs.wcs.cdelt[0])
 
 			modelbeam = enmap.fractional_shift(modelbeam,[pix1_offset,pix2_offset],keepwcs=True)
+			residual = self.tmpbeamclass.trunc_maps[key] - modelbeam
+			return np.mean(residual ** 2)
+		
+		keys = list(self.tmpbeamclass.trunc_maps.keys())
+		chi_parts = Parallel(n_jobs=self.n_jobs, prefer="threads")(
+			delayed(map_cost)(idx, key) for idx, key in enumerate(keys)
+		)
+		chi_squared = sum(chi_parts)
 
-			residual = self.tmpbeamclass.trunc_maps[i] - modelbeam
+		ctmp_strehl = np.zeros(self.tmpbeamclass.zernike_polynomials.shape[0])
+		ctmp_strehl[3] = zern[0]
+		ctmp_strehl[5:] = zern[1:]
 
-			chi_squared+= np.mean(residual**2)
 		self.fitting_counter+=1
 		self.temp_cost = chi_squared
-		self.strehl_ratio = np.amax(self.tmpbeamclass.make_psf(c=ctmp,secondary_offset=0,
+		self.strehl_ratio = np.amax(self.tmpbeamclass.make_psf(c=ctmp_strehl,secondary_offset=0,
 							   del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
 							   f=17.5,F=525.,D=50.))
 		return np.sqrt(chi_squared)
