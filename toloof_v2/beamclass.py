@@ -94,6 +94,9 @@ class Beam:
 		map_mask_tmp= make_mask_enmap(tmpmapload,mask_radius,centervals = map_center,apod_width = None)
 		self.map_mask = map_mask_tmp
 
+		self._lat_phase_cache = (None, None)   # (params, array)
+		self._tilt_phase_cache = (None, None)
+
 	def truncate_maps(self,desired_deltax_size,center_on_brightest_pix=False):
 		"""
 		Truncate the input maps to a square region around the beam center.
@@ -113,13 +116,14 @@ class Beam:
 		self.delta_x = desired_deltax_size
 		#mapsize = int(wavelength/(np.deg2rad(self.trunc_map.wcs.wcs.cdelt[1])*desired_deltax_size))
 
-		N_tmp = int(np.mean(self.wavelengths)/(np.deg2rad(abs(self.original_maps['map0'].wcs.wcs.cdelt[1]))*desired_deltax_size))
+		N_tmp = self.N # int(np.mean(self.wavelengths)/(np.deg2rad(abs(self.original_maps['map0'].wcs.wcs.cdelt[1]))*desired_deltax_size))
 		
 		for i in self.original_maps:
 
 			masked_map = self.original_maps[i]*self.map_mask
-			brightestpix = np.where(masked_map==np.amax(masked_map))
 			self.peak_pixel[i] = np.amax(masked_map)
+			brightestpix = np.where(masked_map==self.peak_pixel[i])
+			
 			# N_tmp = int(np.mean(self.wavelengths)/(np.deg2rad(abs(self.original_maps[i].wcs.wcs.cdelt[1]))*desired_deltax_size))
 			# self.N[i] = N_tmp
 			if center_on_brightest_pix:
@@ -278,6 +282,20 @@ class Beam:
 		diam_primary = 50. 
 		self.zernike_polynomials = gen_zernike_polys(n,m,self.r/(diam_primary/2.),self.phi)
 
+	def _get_lat_phase(self, del_x, del_y, f, F, D):
+		params = (del_x, del_y, f, F, D)
+		if self._lat_phase_cache[0] != params:
+			phase = gen_phase_error_secondary_lat_displacement(self.x, self.y, del_x, del_y, f=f, F=F, D=D)
+			self._lat_phase_cache = (params, phase)
+		return self._lat_phase_cache[1]
+
+	def _get_tilt_phase(self, del_alph_x, del_alph_y, f, F, D):
+		params = (del_alph_x, del_alph_y, f, F, D)
+		if self._tilt_phase_cache[0] != params:
+			phase = gen_phase_error_secondary_tilt(self.x, self.y, del_alph_x, del_alph_y, f=f, F=F, c_minus_a=0.8548, D=D)
+			self._tilt_phase_cache = (params, phase)
+		return self._tilt_phase_cache[1]
+
 	def make_phase(self,wavelength,c=None,secondary_offset=0.,del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
 				  f=17.5,F=525.,D=50.):
 
@@ -297,14 +315,18 @@ class Beam:
 		
 		if c is None:
 			c = np.zeros(self.zernike_polynomials.shape[0])
-		c[0] = 0
+		#c[0] = 0
 		
-		Phi = np.zeros([self.zernike_polynomials.shape[1],self.zernike_polynomials.shape[2]])
-		for i in range(c.size):
-			Phi+=c[i]*self.zernike_polynomials[i,:,:]
+	
+		Phi = np.tensordot(c, self.zernike_polynomials, axes=([0],[0]))
+		# Phi = np.zeros([self.zernike_polynomials.shape[1],self.zernike_polynomials.shape[2]])
+		# for i in range(c.size):
+		# 	Phi+=c[i]*self.zernike_polynomials[i,:,:]
 		delta_phase = gen_defocus_cassegrain_telescope(self.r,secondary_offset,f=f,F=F,D=D)
-		delta_phase2 = gen_phase_error_secondary_lat_displacement(self.x,self.y,del_x,del_y,f=f,F=F,D=D)
-		delta_phase3 = gen_phase_error_secondary_tilt(self.x,self.y,del_alph_x,del_alph_y,f=f,F=F,c_minus_a=0.8548,D=D)
+		# delta_phase2 = gen_phase_error_secondary_lat_displacement(self.x,self.y,del_x,del_y,f=f,F=F,D=D)
+		# delta_phase3 = gen_phase_error_secondary_tilt(self.x,self.y,del_alph_x,del_alph_y,f=f,F=F,c_minus_a=0.8548,D=D)
+		delta_phase2 = self._get_lat_phase(del_x, del_y, f, F, D)
+		delta_phase3 = self._get_tilt_phase(del_alph_x, del_alph_y, f, F, D)
 
 		#tmpphase = Phi+((2.*np.pi)*delta_phase/self.wavelength)+((2.*np.pi)*delta_phase2/self.wavelength)+((2.*np.pi)*delta_phase3/self.wavelength)
 
@@ -366,9 +388,9 @@ class Beam:
 
 			for i in range(len(self.wavelengths)-1):
 				wavelength = self.wavelengths[i]
-				phase = self.make_phase(wavelength,c=c,secondary_offset=secondary_offset,
-									del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
-									f=f,F=F,D=D)
+				# phase = self.make_phase(wavelength,c=c,secondary_offset=secondary_offset,
+				# 					del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
+				# 					f=f,F=F,D=D)
 				psf_i = self.make_psf_monochromatic(wavelength,c=c,secondary_offset=secondary_offset,
 							   del_x=del_x,del_y=del_y,del_alph_x=del_alph_x,del_alph_y=del_alph_y,
 							   f=f,F=F,D=D)

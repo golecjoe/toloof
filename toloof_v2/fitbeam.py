@@ -654,8 +654,19 @@ class fit_beam_with_pointing_offsets:
 		return np.sqrt(chi_squared)
 
 	def run_fitter(self):
-		results = minimize(self.chisquared,x0=self.x0)
-		self.results = results
+		# results = minimize(self.chisquared,x0=self.x0)
+		# self.results = results
+		self.results = minimize(
+			self.chisquared,
+			x0=self.x0,
+			method="Powell",
+			options={
+				#"maxiter": 300,   # raise if you need tighter convergence
+				"xtol": 1e-3,     # parameter tolerance
+				"ftol": 1e-3,     # cost tolerance
+				"disp": True,     # print progress
+			},
+		)
 
 
 	def plot_fit_results(self,vmax_frac_of_source_flux = 0.2,resids_stretch=5,
