@@ -143,7 +143,7 @@ def zernike_poly(n,m,rho,phi):
 	elif m>0:
 		angular_part = np.cos(m*phi)
 	elif m<0:
-		angular_part = np.sin(m*phi)
+		angular_part = np.sin(abs(m)*phi)
 	tmpzern = radial_part*angular_part
 	tmpzern[np.where(rho>0.9999)] = 0
 	return tmpzern*zern_normalization(n,m)

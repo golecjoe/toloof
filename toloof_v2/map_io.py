@@ -257,7 +257,7 @@ def make_coordinate_grids(N,L):
 	x,y = np.meshgrid(np.linspace(-L/2,L/2,N),  ## cartesian coordinates
 					  np.linspace(-L/2,L/2,N))
 	r = np.sqrt(x**2 + y**2)                    ## radial coordainte
-	phi = np.arctan2(y,x)
+	phi = np.arctan2(-y,x)
 	return(x,y,r,phi)
 
 def build_tangent_wcs(n, m, pixscale_deg):
