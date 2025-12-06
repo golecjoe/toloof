@@ -5,6 +5,8 @@ from pixell import enmap, enplot, reproject, utils, curvedsky,wcsutils
 import json
 from scipy.optimize import minimize
 
+
+
 from beamclass import Beam
 
 
@@ -559,7 +561,9 @@ class fit_beam_with_M2_offsets:
 class fit_beam_with_pointing_offsets:
 
 	def __init__(self,beam_class):
+
 		print('Initializing the fit beam class ')
+
 
 		mapcounter= 0 
 		for i in beam_class.trunc_maps:

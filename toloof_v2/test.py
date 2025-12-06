@@ -13,7 +13,7 @@ import time
 
 t1 = time.time()
 
-test_freqs = np.linspace(125,175,5)# np.array([150.]) #np.linspace(125,175,5)
+test_freqs = np.array([150.]) #np.linspace(125,175,5)
 test_wavelengths = 300.E-3/test_freqs
 
 toltec_bandpass = np.load(os.path.expanduser('~/Documents/Work/TolTEC/toloof/model_passbands.npz'))
@@ -36,7 +36,7 @@ for i in obsnums:
 	tel_file_paths.append(tmp_tel_path[0])
 
 
-tmpclass = Beam(map_file_paths,tel_file_paths,test_wavelengths,bandpass=tmp_BP)
+tmpclass = Beam(map_file_paths,tel_file_paths,test_wavelengths,bandpass=None)
 
 tmpclass.initialize_model(aperture_plane_resolution = 0.5,center_on_brightest_pix=False,
 						  include_legs=True,plot_aperture=False,save_aperture=None,
