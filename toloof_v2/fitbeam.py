@@ -561,7 +561,7 @@ class fit_beam_with_M2_offsets:
 
 class fit_beam_with_pointing_offsets:
 
-	def __init__(self,beam_class):
+	def __init__(self,beam_class,n_jobs=1):
 
 		print('Initializing the fit beam class ')
 
@@ -612,7 +612,7 @@ class fit_beam_with_pointing_offsets:
 		self.fitting_counter = 0
 		self.temp_cost = -999
 
-		self.n_jobs = 8
+		self.n_jobs = n_jobs
 
 	def chisquared(self,x):
 
