@@ -254,6 +254,7 @@ def make_coordinate_grids(N,L):
 	phi : ndarray
 		2D array of polar angles (in radians), measured counter-clockwise from +x axis.
 	"""
+	# use increasing y with index; flip in phi to keep CCW convention without mirroring the sampled grid
 	x,y = np.meshgrid(np.linspace(-L/2,L/2,N),  ## cartesian coordinates
 					  np.linspace(-L/2,L/2,N))
 	r = np.sqrt(x**2 + y**2)                    ## radial coordainte
@@ -289,4 +290,3 @@ def build_tangent_wcs(n, m, pixscale_deg):
 	w.wcs.cdelt = [-pixscale_deg, pixscale_deg]  # flip RA axis to follow sky convention
 
 	return w
-

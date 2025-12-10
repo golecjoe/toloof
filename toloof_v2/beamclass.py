@@ -357,7 +357,7 @@ class Beam:
 		PSF = Convert_field_to_PSF(U)
 		tmpnewwcs = build_tangent_wcs(U.shape[0], U.shape[1], farfield_pix_size)
 
-		PSF = enmap.enmap(PSF,tmpnewwcs)
+		PSF = enmap.enmap(PSF[::-1,:],tmpnewwcs)
 
 		PSF_proj = enmap.project(PSF,self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs)
 

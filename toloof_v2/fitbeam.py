@@ -671,22 +671,42 @@ class fit_beam_with_pointing_offsets:
 		self.strehl_ratio = np.amax(self.tmpbeamclass.make_psf(c=ctmp_strehl,secondary_offset=0,
 							   del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
 							   f=17.5,F=525.,D=50.))
-		return np.sqrt(chi_squared)
+		#return np.sqrt(chi_squared)
+		return chi_squared
 
 	def run_fitter(self):
-		# results = minimize(self.chisquared,x0=self.x0)
-		# self.results = results
-		self.results = minimize(
-			self.chisquared,
-			x0=self.x0,
-			method="Powell",
-			options={
-				#"maxiter": 300,   # raise if you need tighter convergence
-				"xtol": 1e-3,     # parameter tolerance
-				"ftol": 1e-3,     # cost tolerance
-				"disp": True,     # print progress
-			},
-		)
+		"""Run the fitter; default to a gradient-based solver so we can compare to Powell."""
+		# Switch between methods by passing method="Powell" or any scipy-supported solver.
+		bounds = [(None, None)] * self.fit_vec_size
+		for i in range(self.tilt_offset_start_index, self.tilt_offset_end_index):
+			bounds[i] = (-15, 15)  # arcsec limits; adjust as needed
+		method = "Powell"
+		if method == "Powell":
+			self.results = minimize(
+				self.chisquared,
+				x0=self.x0,
+				method="Powell",
+				options={
+					#"maxiter": 300,   # raise if you need tighter convergence
+					"xtol": 1e-3,     # parameter tolerance
+					"ftol": 1e-3,     # cost tolerance
+					"disp": True,     # print progress
+				},
+			)
+		else:
+			self.results = minimize(
+				self.chisquared,
+				x0=self.x0,
+				method=method,
+				jac="2-point",  # finite-diff gradient
+				bounds=bounds,
+				options={
+					"maxiter": 3000,
+					"ftol": 1e-12,   # tighten if convergence is loose
+					"gtol": 1e-4,
+					"disp": True,
+				},
+			)
 
 
 	def plot_fit_results(self,vmax_frac_of_source_flux = 0.2,resids_stretch=5,
@@ -858,7 +878,6 @@ class fit_beam_with_pointing_offsets:
 					results_dict[key] = value.tolist()
 		with open(savefilename, "w") as f:
 			json.dump(results_dict, f, indent=4)
-
 
 
 
