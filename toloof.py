@@ -271,8 +271,9 @@ def make_coordinate_grids(N,L):
 	x,y = np.meshgrid(np.linspace(-L/2,L/2,N),  ## cartesian coordinates
 					  np.linspace(-L/2,L/2,N))
 	r = np.sqrt(x**2 + y**2)                    ## radial coordainte
-	phi = np.arctan2(y,x)
+	phi = np.arctan2(-y,x)
 	return(x,y,r,phi)
+
 
 def gaussian(rarray,sig):
 	"""
@@ -541,7 +542,7 @@ def zernike_poly(n,m,rho,phi):
 	elif m>0:
 		angular_part = np.cos(m*phi)
 	elif m<0:
-		angular_part = np.sin(m*phi)#-np.sin(m*phi)
+		angular_part = np.sin(abs(m)*phi)#-np.sin(m*phi)
 	tmpzern = radial_part*angular_part
 	tmpzern[np.where(rho>0.9999)] = 0
 	return tmpzern*zern_normalization(n,m)
@@ -778,23 +779,23 @@ class Fraunhofer_Image:
 		spider_template = np.ones(self.y.shape)
 
 		for i in range(spidershadow_y.size):
-		    spider_template[np.where(np.abs(self.y[:,i])<spidershadow_y[i]),i] = 0
+			spider_template[np.where(np.abs(self.y[:,i])<spidershadow_y[i]),i] = 0
 
 		# theta in degrees; positive = counterclockwise
 		spider_leg1 = rotate(spider_template, angle=45., reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg1 = (spider_leg1 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_leg2 = rotate(spider_template, angle=135., reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg2 = (spider_leg2 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_leg3 = rotate(spider_template, angle=225., reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg3 = (spider_leg3 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_leg4 = rotate(spider_template, angle=315, reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg4 = (spider_leg4 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_legs_total = spider_leg1*spider_leg2*spider_leg3*spider_leg4
@@ -1172,23 +1173,23 @@ class Fraunhofer_Beamfit:
 		spider_template = np.ones(self.y.shape)
 
 		for i in range(spidershadow_y.size):
-		    spider_template[np.where(np.abs(self.y[:,i])<spidershadow_y[i]),i] = 0
+			spider_template[np.where(np.abs(self.y[:,i])<spidershadow_y[i]),i] = 0
 
 		# theta in degrees; positive = counterclockwise
 		spider_leg1 = rotate(spider_template, angle=45., reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg1 = (spider_leg1 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_leg2 = rotate(spider_template, angle=135., reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg2 = (spider_leg2 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_leg3 = rotate(spider_template, angle=225., reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg3 = (spider_leg3 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_leg4 = rotate(spider_template, angle=315, reshape=False,
-		                  order=0, mode='constant', cval=0)
+						  order=0, mode='constant', cval=0)
 		spider_leg4 = (spider_leg4 > 0.5).astype(spider_template.dtype)  # keep it binary
 
 		spider_legs_total = spider_leg1*spider_leg2*spider_leg3*spider_leg4
@@ -2369,14 +2370,14 @@ class Fraunhofer_Beamfit:
 		self.bestfitbeam = tmppsf_raw
 	def make_zernike_results_dict_ptingoffset(self):
 		zernike_labels = np.array(['Amplitude','M2.Z Offset',
-			                       'TILT_Y_map0','TILT_X_map0',
-			                       'TILT_Y_map1','TILT_X_map1',
-			                       'TILT_Y_map2','TILT_X_map2',
-			                       'AST_V', 'AST_O', 
-			                       'COMA_H', 'COMA_V', 'TRE_O', 
-			                       'TRE_V', 'SPH', 'QUAD_V', 
-			                       'QUAD_O', 'AST2_O', 'AST2_V',
-			                       'cost','gain_loss'])
+								   'TILT_Y_map0','TILT_X_map0',
+								   'TILT_Y_map1','TILT_X_map1',
+								   'TILT_Y_map2','TILT_X_map2',
+								   'AST_V', 'AST_O', 
+								   'COMA_H', 'COMA_V', 'TRE_O', 
+								   'TRE_V', 'SPH', 'QUAD_V', 
+								   'QUAD_O', 'AST2_O', 'AST2_V',
+								   'cost','gain_loss'])
 		zernike_values = np.array([
 			self.results.x[0],self.results.x[1],
 			self.results.x[2],self.results.x[3],
@@ -2640,8 +2641,8 @@ class Fraunhofer_Beamfit:
 		self.bestfitbeam = tmppsf_raw
 	def make_focus_and_astig_results(self):
 		results_labels = np.array(['source_amp','M2.Z_offset','TILT_Y_map0','TILT_X_map0',
-			                       'TILT_Y_map1','TILT_X_map1','TILT_Y_map2','TILT_X_map2',
-			                       'AST_O','AST_V'])
+								   'TILT_Y_map1','TILT_X_map1','TILT_Y_map2','TILT_X_map2',
+								   'AST_O','AST_V'])
 		results_values = self.results.x[:] 
 		results_dict = {
 			'labels': results_labels.tolist(),  # Convert NumPy array to list
@@ -2914,7 +2915,7 @@ class Fraunhofer_Beamfit:
 		self.make_focus_and_astig_results()
 	def make_focus_and_astig_results_M2included(self):
 		results_labels = np.array(['source_amp','M2.Z_offset','M2.X Offset','M2.Y Offset','TILT_Y_map0','TILT_X_map0',
-			                       'AST_O','AST_V', 'TRE_V','TRE_O','cost','gain_loss'])
+								   'AST_O','AST_V', 'TRE_V','TRE_O','cost','gain_loss'])
 		results_values = self.results.x[:] 
 		results_values = np.concatenate((results_values,np.array([self.cost,self.gain_loss])))
 		results_dict = {
@@ -3179,11 +3180,11 @@ class Fraunhofer_Beamfit:
 
 	def make_zernike_results_dict_nocoma(self):
 		zernike_labels = np.array(['amp','M2.X_offset','M2.Y_offset','M2.Z_offset',
-			                       'Y_Tilt','X_Tilt',
-			                       'AST_O', 'AST_V',
-			                       'TRE_V', 'TRE_O',
-			                       'QUAD_O','SPH', 'QUAD_V', 
-			                       'AST2_V', 'AST2_O'])
+								   'Y_Tilt','X_Tilt',
+								   'AST_O', 'AST_V',
+								   'TRE_V', 'TRE_O',
+								   'QUAD_O','SPH', 'QUAD_V', 
+								   'AST2_V', 'AST2_O'])
 		zernike_values = self.results.x[:]
 
 		zernike_dict = {
