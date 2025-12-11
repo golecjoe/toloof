@@ -271,7 +271,7 @@ def make_coordinate_grids(N,L):
 	x,y = np.meshgrid(np.linspace(-L/2,L/2,N),  ## cartesian coordinates
 					  np.linspace(-L/2,L/2,N))
 	r = np.sqrt(x**2 + y**2)                    ## radial coordainte
-	phi = np.arctan2(y,x)
+	phi = np.arctan2(-y,x)
 	return(x,y,r,phi)
 
 
@@ -1380,6 +1380,7 @@ class Fraunhofer_Beamfit:
 		farfield_im_size, U = Fraunhofer(A_complex,self.wavelength,self.delta_x)
 
 		PSF,PSF_dB = Convert_field_to_PSF(U)
+		PSF = PSF[:,::-1]
 		self.PSF = enmap.enmap(PSF/self.normalizing_amplitude_monochromatic,wcs=self.newmapwcs['map0'])
 		if return_psf:
 			return self.PSF
