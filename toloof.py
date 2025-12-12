@@ -2242,7 +2242,8 @@ class Fraunhofer_Beamfit:
 			#self.quick_plot_results(model_map0,model_map1,model_map2,plot_vmin=-500,plot_vmax=500.,resids_vmin=None,resids_vmax=None,save_fig_name=None,noshow=False,plot_title=None,lowerleft=[-0.75/60,-0.75/60.],upperright=[0.75/60,0.75/60.])
 		return chisquare
 		
-	def fit_beam_with_pointing_offsets(self,c_guess=None,secondary_throw_array=[-1E-3,0,1E-3],boundvals = None,fit_achromatic_beam=False):
+	def fit_beam_with_pointing_offsets(self,c_guess=None,secondary_throw_array=[-1E-3,0,1E-3],boundvals = None,
+									   fit_achromatic_beam=False,x0=None):
 		print('RUNNING fit_beam_with_pointing_offsets')
 		"""
 		Fit the beam model to the input maps by optimizing Zernike phase terms
@@ -2276,13 +2277,13 @@ class Fraunhofer_Beamfit:
 
 		self.achro_beam_fit = fit_achromatic_beam
 
+		if x0 is None:
+			x0 = np.zeros(self.zernike_polynomials.shape[0]+4) # need to make an array that has the zernike coeffs plus 1 for theta0
+			x0[0] = np.amax(self.trunc_maps['map1'])
 
-		x0 = np.zeros(self.zernike_polynomials.shape[0]+4) # need to make an array that has the zernike coeffs plus 1 for theta0
-		x0[0] = np.amax(self.trunc_maps['map1'])
-
-		
-		if c_guess is not None:
-			x0[11:] = c_guess
+			
+			if c_guess is not None:
+				x0[11:] = c_guess
 		
 		self.fit_step_counter = 0
 		results = minimize(self.function2minimize_with_pointing_offsets,x0,args=secondary_throw_array,bounds=boundvals)
