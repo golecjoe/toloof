@@ -947,7 +947,7 @@ class fit_beam_with_pointing_tilt_offsets:
 		# self.results = results
 		self.results = minimize(
 			self.chisquared,
-			x0=self.x0,
+			x0=self.x0
 			# method="Powell",
 			# options={
 			# 	#"maxiter": 300,   # raise if you need tighter convergence

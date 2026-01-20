@@ -359,7 +359,8 @@ class Beam:
 
 		PSF = enmap.enmap(PSF,tmpnewwcs)
 
-		PSF_proj = enmap.project(PSF,self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs)
+		#PSF_proj = enmap.project(PSF,self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs)
+		PSF_proj = enmap.project(PSF,self.trunc_maps['map0'].shape,self.trunc_maps['map0'].wcs,mode='nearest')
 
 		return PSF_proj
 
