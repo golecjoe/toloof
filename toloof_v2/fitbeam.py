@@ -936,7 +936,7 @@ class fit_beam_with_pointing_tilt_offsets:
 
 			chi_squared+= np.mean(residual**2)
 		self.fitting_counter+=1
-		self.temp_cost = chi_squared
+		self.temp_cost = np.sqrt(chi_squared)
 		self.strehl_ratio = np.amax(self.tmpbeamclass.make_psf(c=ctmp,secondary_offset=0,
 							   del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
 							   f=17.5,F=525.,D=50.))
