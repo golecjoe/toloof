@@ -22,7 +22,7 @@ simbeam1 = SimBeam(test_wavelengths,2.0/3600.,10./60.,bandpass = None)
 
 simbeam1.initialize_model(
 						include_legs=True,plot_aperture=False,save_aperture=None,
-						aperture_fwhm = 48.,edge_taper_diameter=48.,plot_illumination=False,
+						aperture_fwhm = 45.,edge_taper_diameter=45.,plot_illumination=False,
 						n=4,m=4)
 
 
@@ -33,7 +33,7 @@ c_tmp_microns[1] = 0. # Y-TILT
 c_tmp_microns[2] = 0. # X-TILT
 c_tmp_microns[3] = 0. # OBLIQUE ASTIGMATISM
 c_tmp_microns[4] = 0. # DEFOCUS
-c_tmp_microns[5] = 200. # VERTICAL ASTIGMATISM
+c_tmp_microns[5] = 0. # VERTICAL ASTIGMATISM
 c_tmp_microns[6] = 0. # VERTICAL TREFOIL
 c_tmp_microns[7] = 0. # VERTICAL COMA
 c_tmp_microns[8] = 0. # HORIZONTAL COMA
@@ -42,7 +42,7 @@ c_tmp_microns[10] = 0. # OBLIQUE QUADFOIL
 c_tmp_microns[11] = 0. # OBLIQUE SECONDARY ASTIGMATISM
 c_tmp_microns[12] = 0. # SPHERICAL ABERRATION
 c_tmp_microns[13] = 0. # VERTICAL SECONDARY ASTIGMATISM
-c_tmp_microns[14] = 0. # VERTICAL QUADFOIL
+c_tmp_microns[14] = 200. # VERTICAL QUADFOIL
 
 
 c_tmp_phase = (c_tmp_microns*1E-6*2*np.pi*np.sqrt(2))/(np.mean(test_wavelengths))
@@ -75,3 +75,5 @@ cbar.set_label(label='dB',rotation=270,labelpad=15,fontsize=14)
 
 
 plt.show()
+
+
