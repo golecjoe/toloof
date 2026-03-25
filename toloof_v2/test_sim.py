@@ -9,16 +9,16 @@ from scipy.interpolate import interp1d
 import time
 
 
-test_freqs = np.linspace(125,175,5)
+test_freqs = np.array([150.0])#np.linspace(125,175,5)
 test_wavelengths = 300.E-3/test_freqs
 
-toltec_bandpass = np.load(os.path.expanduser('~/Documents/Work/TolTEC/toloof/model_passbands.npz'))
+#toltec_bandpass = np.load(os.path.expanduser('~/Documents/Work/TolTEC/toloof/model_passbands.npz'))
 
-interpt_BP_f = interp1d(toltec_bandpass['f_GHz'],toltec_bandpass['band_150'])
+#interpt_BP_f = interp1d(toltec_bandpass['f_GHz'],toltec_bandpass['band_150'])
 
-tmp_BP = interpt_BP_f(test_freqs)
+#tmp_BP = interpt_BP_f(test_freqs)
 
-simbeam1 = SimBeam(test_wavelengths,2.0/3600.,10./60.,bandpass = tmp_BP)
+simbeam1 = SimBeam(test_wavelengths,2.0/3600.,10./60.,bandpass = None)
 
 simbeam1.initialize_model(
 						include_legs=True,plot_aperture=False,save_aperture=None,
@@ -45,7 +45,7 @@ c_tmp_microns[13] = 0. # VERTICAL SECONDARY ASTIGMATISM
 c_tmp_microns[14] = 0. # VERTICAL QUADFOIL
 
 
-c_tmp_phase = (c_tmp_microns*1E-6*2*np.pi)/(np.mean(test_wavelengths)*np.sqrt(2))
+c_tmp_phase = (c_tmp_microns*1E-6*2*np.pi*np.sqrt(2))/(np.mean(test_wavelengths))
 
 
 tmppsf1 = simbeam1.make_psf(c=c_tmp_phase,
@@ -71,7 +71,7 @@ plt.xlim([boxsize/2.,-boxsize/2.])
 plt.ylim([-boxsize/2.,boxsize/2.])
 cbar_ax = fig.add_axes([0.91, 0.15, 0.01, 0.7])
 cbar = fig.colorbar(im, cax=cbar_ax)
-cbar.set_label(label='mJy/beam',rotation=270,labelpad=15,fontsize=14)    
+cbar.set_label(label='dB',rotation=270,labelpad=15,fontsize=14)    
 
 
 plt.show()
