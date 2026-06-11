@@ -35,7 +35,7 @@ class Beam:
 	inputfitsfileformat : str, optional
 		Format of input FITS files. Currently supports 'citlali'.
 	"""
-	def __init__(self,paths2files,paths2telfiles,
+	def __init__(self,paths2files,#paths2telfiles,
 				 wavelengths,bandpass=None,
 				 mask_radius=1.5/60.,map_center = [0.,0.],padpixels = None):
 		
@@ -54,13 +54,15 @@ class Beam:
 		#only make this work with citlali maps
 		tmpmapdict = {}
 		signalmaps = {}
+		m2z_vals = {}
 		for i,path in enumerate(paths2files):
 			tmpmap = CitlaliMaps(path)
 			tmpmapdict['map'+str(i)] = tmpmap
 			signalmaps['map'+str(i)] = tmpmap.maps['signal_I']
-		m2z_vals = {}
-		for i,path in enumerate(paths2telfiles):
-			m2z_vals['map'+str(i)] = get_M2z_from_tel(path)*1E-3
+			m2z_vals['map'+str(i)] = tmpmap.primary_header['OOF_M2Z']*1.E-6
+		# m2z_vals = {}
+		# for i,path in enumerate(paths2telfiles):
+		# 	m2z_vals['map'+str(i)] = get_M2z_from_tel(path)*1E-3
 		self.m2z_vals = m2z_vals
 
 		for i in signalmaps:
@@ -318,7 +320,12 @@ class Beam:
 		#c[0] = 0
 		
 	
-		Phi = np.tensordot(c, self.zernike_polynomials, axes=([0],[0]))
+		#Phi = np.tensordot(c, self.zernike_polynomials, axes=([0],[0]))
+		
+
+		Phi = np.tensordot(c*((2*np.pi)/(1E6*wavelength)), self.zernike_polynomials, axes=([0],[0]))
+		
+
 		# Phi = np.zeros([self.zernike_polynomials.shape[1],self.zernike_polynomials.shape[2]])
 		# for i in range(c.size):
 		# 	Phi+=c[i]*self.zernike_polynomials[i,:,:]
@@ -332,7 +339,7 @@ class Beam:
 
 		# tmpphase = Phi+((2.*np.pi)*delta_phase/np.mean(self.wavelengths))+((2.*np.pi)*delta_phase2/np.mean(self.wavelengths))+((2.*np.pi)*delta_phase3/np.mean(self.wavelengths))
 		tmpphase = Phi+((2.*np.pi)*delta_phase/wavelength)+((2.*np.pi)*delta_phase2/wavelength)+((2.*np.pi)*delta_phase3/wavelength)
-
+		
 		return tmpphase
 
 	def make_psf_monochromatic(self,wavelength,c=None,secondary_offset=0.,
@@ -403,9 +410,9 @@ class Beam:
 			return PSF/self.norm_amplitude
 
 	def make_normalizing_amplitude(self):
-		A_complex = self.Aperture*self.illumination
+		# A_complex = self.Aperture*self.illumination
 
-		phase = np.zeros(A_complex.shape)
+		# phase = np.zeros(A_complex.shape)
 
 
 		if self.wavelengths.size==1:

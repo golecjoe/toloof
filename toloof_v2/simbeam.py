@@ -322,14 +322,20 @@ class SimBeam:
 		self.make_normalizing_amplitude()
 
 
-	def make_citlali_fits(self,obsnum, array,fname):
+	def make_citlali_fits(self,obsnum, array,fname,weights_values=0.,oof_rms_val=0.0):
 
-		primary_hdu = fits.PrimaryHDU(header=make_primary_header(obsnum,array,self.m2pos*1E6))
+		primary_hdu = fits.PrimaryHDU(header=make_primary_header(obsnum,array,self.m2pos*1E6,oof_rms=oof_rms_val))
 
+		# make noise 
+
+		noise = np.random.normal(loc=0.0, scale=oof_rms_val, size=self.PSF.shape)
+
+		if weights_values==0. and oof_rms_val!=0:
+			weights_values = 1./oof_rms_val**2
 
 		# get psf array in citlali fits format
-		signal_hdu = make_image_hdu(self.PSF,array,'signal_I')
-		weights_hdu = make_image_hdu(self.PSF*0.,array,'weight_I')
+		signal_hdu = make_image_hdu(self.PSF+noise,array,'signal_I')
+		weights_hdu = make_image_hdu((self.PSF*0.)+weights_values,array,'weight_I')
 		coverage_hdu = make_image_hdu(self.PSF*0.,array,'coverage_I')
 		covbool_hdu = make_image_hdu(self.PSF*0.,array,'coverage_bool_I')
 		sig2noise_hdu = make_image_hdu(self.PSF*0.,array,'sig2noise_I')
