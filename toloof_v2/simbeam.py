@@ -195,10 +195,10 @@ class SimBeam:
 		if c is None:
 			c = np.zeros(self.zernike_polynomials.shape[0])
 		c[0] = 0
-		
-		Phi = np.zeros([self.zernike_polynomials.shape[1],self.zernike_polynomials.shape[2]])
-		for i in range(c.size):
-			Phi+=c[i]*self.zernike_polynomials[i,:,:]
+		Phi = np.tensordot(c*((2*np.pi)/(1E6*wavelength)), self.zernike_polynomials, axes=([0],[0]))
+		#Phi = np.zeros([self.zernike_polynomials.shape[1],self.zernike_polynomials.shape[2]])
+		#for i in range(c.size):
+		#	Phi+=c[i]*self.zernike_polynomials[i,:,:]
 		delta_phase = gen_defocus_cassegrain_telescope(self.r,secondary_offset,f=f,F=F,D=D)
 		delta_phase2 = gen_phase_error_secondary_lat_displacement(self.x,self.y,del_x,del_y,f=f,F=F,D=D)
 		delta_phase3 = gen_phase_error_secondary_tilt(self.x,self.y,del_alph_x,del_alph_y,f=f,F=F,c_minus_a=0.8548,D=D)
