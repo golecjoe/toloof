@@ -948,14 +948,49 @@ class fit_beam_with_pointing_tilt_offsets:
 	def run_fitter(self):
 		# results = minimize(self.chisquared,x0=self.x0)
 		# self.results = results
+		self.temp_cost = 1E6
+
+		stop_delta_cost = 0.010  # mJy/beam = 10 uJy/beam
+		patience = 50             # require x consecutive small changes
+		previous_cost = [None]
+		small_change_counter = [0]
+
+		def callback(xk):
+			current_cost = self.temp_cost
+
+			if previous_cost[0] is not None:
+				delta_cost = abs(previous_cost[0] - current_cost)
+
+				if delta_cost < stop_delta_cost:
+					small_change_counter[0] += 1
+
+					print(
+						f"Small cost change {small_change_counter[0]}/{patience}: "
+						f"delta = {delta_cost:.6g}: "
+						f"cost = {current_cost:.6g}: "
+					)
+
+					if small_change_counter[0] >= patience:
+						print(
+							f"Stopping: cost change has been less than "
+							f"{stop_delta_cost:.6g} for {patience} consecutive iterations."
+						)
+						raise StopIteration
+
+				else:
+					small_change_counter[0] = 0
+
+			previous_cost[0] = current_cost
+
 		self.results = minimize(
 			self.chisquared,
 			x0=self.x0,
+			callback=callback,
 			#method="L-BFGS-B",
 			options={
 				#"maxiter": 9000,   # raise if you need tighter convergence
 				#"xtol": 1e-3,     # parameter tolerance
-				#"ftol": 1.e-6,     # cost tolerance
+				#"ftol": 1.e-7,     # cost tolerance
 				#"disp": True,     # print progress
 			},
 		)
