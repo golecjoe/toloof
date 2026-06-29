@@ -945,13 +945,14 @@ class fit_beam_with_pointing_tilt_offsets:
 							   f=17.5,F=525.,D=50.))
 		return np.sqrt(chi_squared)
 
-	def run_fitter(self):
+	def run_fitter(self,stop_delta_cost=None,patience=None):
 		# results = minimize(self.chisquared,x0=self.x0)
 		# self.results = results
 		self.temp_cost = 1E6
-
-		stop_delta_cost = 0.010  # mJy/beam = 10 uJy/beam
-		patience = 50             # require x consecutive small changes
+		if stop_delta_cost is None:
+			stop_delta_cost = 0.010  # mJy/beam = 10 uJy/beam
+		if patience is None:
+			patience = 50             # require x consecutive small changes
 		previous_cost = [None]
 		small_change_counter = [0]
 
@@ -986,6 +987,7 @@ class fit_beam_with_pointing_tilt_offsets:
 			self.chisquared,
 			x0=self.x0,
 			callback=callback,
+			#tol=1E-9,
 			#method="L-BFGS-B",
 			options={
 				#"maxiter": 9000,   # raise if you need tighter convergence

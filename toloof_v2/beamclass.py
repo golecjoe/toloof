@@ -37,7 +37,8 @@ class Beam:
 	"""
 	def __init__(self,paths2files,#paths2telfiles,
 				 wavelengths,bandpass=None,
-				 mask_radius=1.5/60.,map_center = [0.,0.],padpixels = None):
+				 mask_radius=1.5/60.,map_center = [0.,0.],padpixels = None,
+				 mapkey = 'signal_I'):
 		
 		# this class fits one wavelength at a time
 			
@@ -58,7 +59,7 @@ class Beam:
 		for i,path in enumerate(paths2files):
 			tmpmap = CitlaliMaps(path)
 			tmpmapdict['map'+str(i)] = tmpmap
-			signalmaps['map'+str(i)] = tmpmap.maps['signal_I']
+			signalmaps['map'+str(i)] = tmpmap.maps[mapkey]
 			m2z_vals['map'+str(i)] = tmpmap.primary_header['OOF_M2Z']*1.E-6
 		# m2z_vals = {}
 		# for i,path in enumerate(paths2telfiles):
