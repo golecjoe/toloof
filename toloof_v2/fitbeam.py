@@ -1270,14 +1270,14 @@ class fit_beam_with_M2_offsets_globTilt:
 	def run_fitter(self):
 		self.x0[1] = 0.
 
-		self.x0[4] = 0.2E-3
-		self.x0[5] = 2.5E-3
+		self.x0[4] = 0.0#0.2E-3
+		self.x0[5] = 0.0#2.5E-3
 
-		self.x0[6] = -53.5*1E-6*np.sqrt(2)*(2.*np.pi/np.mean(self.tmpbeamclass.wavelengths))
-		self.x0[7] = -45*1E-6*np.sqrt(2)*(2.*np.pi/np.mean(self.tmpbeamclass.wavelengths))
-		self.x0[8] = 20*1E-6*np.sqrt(2)*(2.*np.pi/np.mean(self.tmpbeamclass.wavelengths))
-		self.x0[9] = -43*1E-6*np.sqrt(2)*(2.*np.pi/np.mean(self.tmpbeamclass.wavelengths))
-		self.x0[10] = 19*1E-6*np.sqrt(2)*(2.*np.pi/np.mean(self.tmpbeamclass.wavelengths))
+		self.x0[6] = 0.0#-53.5*1E-6*np.sqrt(2)*(2.*np.pi/np.mean(self.tmpbeamclass.wavelengths))
+		self.x0[7] = 0.0#-45*1E-6*np.sqrt(2)*(2.*np.pi/np.mean(self.tmpbeamclass.wavelengths))
+		self.x0[8] = 0.0#20*1E-6*np.sqrt(2)*(2.*np.pi/np.mean(self.tmpbeamclass.wavelengths))
+		self.x0[9] = 0.0#-43*1E-6*np.sqrt(2)*(2.*np.pi/np.mean(self.tmpbeamclass.wavelengths))
+		self.x0[10] = 0.0#19*1E-6*np.sqrt(2)*(2.*np.pi/np.mean(self.tmpbeamclass.wavelengths))
 
 		lower_bounds = np.full_like(self.x0, -np.inf, dtype=float)
 		upper_bounds = np.full_like(self.x0,  np.inf, dtype=float)
@@ -1440,6 +1440,24 @@ class fit_beam_with_M2_offsets_globTilt:
 			plt.show()
 		else:
 			plt.close()
+	def surface_plot(self,savefilename,vmin=-400,vmax=400):
+		cfit = np.zeros(self.tmpbeamclass.zernike_polynomials.shape[0])
+		cfit[3] = self.results.x[self.tilt_offset_end_index]
+		cfit[5:] = self.results.x[self.tilt_offset_end_index+1:]
+		OPD = np.tensordot(cfit, self.tmpbeamclass.zernike_polynomials, axes=([0],[0]))
+		plt.figure()
+		plt.imshow(OPD,extent=([-self.tmpbeamclass.L/2.,self.tmpbeamclass.L/2.,-self.tmpbeamclass.L/2.,self.tmpbeamclass.L/2.]),
+			vmin=vmin,vmax=vmax)
+		#plt.imshow(OPD)
+
+		plt.xlim(-30,30)
+		plt.ylim(-30,30)
+		plt.xlabel('x (meters)')
+		plt.ylabel('y (meters)')
+		cbar = plt.colorbar()
+		cbar.set_label('OPD (microns)',rotation=-90,labelpad=20)
+		plt.savefig(savefilename,bbox_inches='tight')
+		plt.close()
 
 	def save_results(self,savefilename):
 		zernike_labels = ['AST_O','AST_V','TRE_V','TRE_O','QUAD_O','AST2_O','SPH','AST2_V','QUAD_V']
