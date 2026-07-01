@@ -38,7 +38,8 @@ class Beam:
 	def __init__(self,paths2files,#paths2telfiles,
 				 wavelengths,bandpass=None,
 				 mask_radius=1.5/60.,map_center = [0.,0.],padpixels = None,
-				 mapkey = 'signal_I'):
+				 mapkey = 'signal_I',
+				 science_map_flag = False):
 		
 		# this class fits one wavelength at a time
 			
@@ -70,11 +71,13 @@ class Beam:
 			tmpmap = signalmaps[i]
 			if tmpmap.wcs.wcs.ctype[0]=='AZOFFSET':
 				tmpmap.wcs.wcs.ctype[0] = 'RA---TAN'
-				tmpmap.wcs.wcs.cdelt[0] = tmpmap.wcs.wcs.cdelt[0]/3600.
+				if not science_map_flag:
+					tmpmap.wcs.wcs.cdelt[0] = tmpmap.wcs.wcs.cdelt[0]/3600.
 				tmpmap.wcs.wcs.cunit[0] = 'deg'
 			if tmpmap.wcs.wcs.ctype[1]=='ELOFFSET':
 				tmpmap.wcs.wcs.ctype[1] = 'DEC--TAN'
-				tmpmap.wcs.wcs.cdelt[1] = tmpmap.wcs.wcs.cdelt[1]/3600.
+				if not science_map_flag:
+					tmpmap.wcs.wcs.cdelt[1] = tmpmap.wcs.wcs.cdelt[1]/3600.
 				tmpmap.wcs.wcs.cunit[1] = 'deg'
 			signalmaps[i] = tmpmap
 
