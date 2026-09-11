@@ -1,2 +1,12 @@
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+.venv/
+venv/
+env/
+ENV/
+
+.conda/
+conda-env/
+.DS_Store
