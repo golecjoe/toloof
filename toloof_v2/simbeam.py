@@ -176,7 +176,7 @@ class SimBeam:
 		self.zernike_polynomials = gen_zernike_polys(n,m,self.r/(diam_primary/2.),self.phi)
 
 	def make_phase(self,wavelength,c=None,secondary_offset=0.,del_x=0.,del_y=0.,del_alph_x=0.,del_alph_y=0.,
-				  f=17.5,F=525.,D=50.):
+				  f=17.5,F=525.,D=50.,plot_phase=False,save_phase=None,vmin=None,vmax=None):
 
 		"""
 		Apply a phase screen composed of Zernike coefficients and Cassegrain defocus.
@@ -207,6 +207,20 @@ class SimBeam:
 
 		# tmpphase = Phi+((2.*np.pi)*delta_phase/np.mean(self.wavelengths))+((2.*np.pi)*delta_phase2/np.mean(self.wavelengths))+((2.*np.pi)*delta_phase3/np.mean(self.wavelengths))
 		tmpphase = Phi+((2.*np.pi)*delta_phase/wavelength)+((2.*np.pi)*delta_phase2/wavelength)+((2.*np.pi)*delta_phase3/wavelength)
+
+		if plot_phase:
+			plt.figure()
+			plt.imshow(tmpphase*wavelength*1E6/(2.*np.pi),extent=([-self.L/2, self.L/2, -self.L/2, self.L/2]),
+						vmin=vmin,vmax=vmax)
+			plt.title("Surface Error")
+			plt.xlabel("x [m]")
+			plt.ylabel("y [m]")
+			plt.xlim(-30,30)
+			plt.ylim(-30,30)
+			cbar = plt.colorbar()
+			cbar.set_label('Error (microns)',rotation=-90)
+			plt.savefig(save_phase,bbox_inches='tight')
+			plt.show()
 
 		return tmpphase
 

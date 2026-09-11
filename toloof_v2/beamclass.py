@@ -72,7 +72,7 @@ class Beam:
 			if tmpmap.wcs.wcs.ctype[0]=='AZOFFSET':
 				tmpmap.wcs.wcs.ctype[0] = 'RA---TAN'
 				if not science_map_flag:
-					tmpmap.wcs.wcs.cdelt[0] = tmpmap.wcs.wcs.cdelt[0]/3600.
+					tmpmap.wcs.wcs.cdelt[0] = -tmpmap.wcs.wcs.cdelt[0]/3600.
 				tmpmap.wcs.wcs.cunit[0] = 'deg'
 			if tmpmap.wcs.wcs.ctype[1]=='ELOFFSET':
 				tmpmap.wcs.wcs.ctype[1] = 'DEC--TAN'
