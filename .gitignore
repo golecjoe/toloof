@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+toloof_v2/__pycache__/
 
 .venv/
 venv/
