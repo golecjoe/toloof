@@ -2038,80 +2038,147 @@ class fit_beam_with_pointing_tilt_offsets_leastsquares:
 		self.datamodelresid_fname = savefigname
 
 
-	def save_results(self,savefilename):
-		zernike_labels = ['AST_O','AST_V','TRE_V','COMA_V','COMA_H','TRE_O','QUAD_O','AST2_O','SPH','AST2_V','QUAD_V']
+	def save_results(self, savefilename):
+
+		# Friendly names for the Zernike modes you commonly use.
+		# These correspond to OSA/ANSI indices 4 through 14.
+		zernike_labels = {
+			4:  'AST_O',
+			5:  'AST_V',
+			6:  'TRE_V',
+			7:  'COMA_V',
+			8:  'COMA_H',
+			9:  'TRE_O',
+			10: 'QUAD_O',
+			11: 'AST2_O',
+			12: 'SPH',
+			13: 'AST2_V',
+			14: 'QUAD_V',
+		}
+
 		results_dict = {}
+
+		# --------------------------------------------------
+		# General fit parameters
+		# --------------------------------------------------
+
 		results_dict['source_amp'] = self.results.x[0]
 		results_dict['M2.Z_offset'] = self.results.x[1]
 		results_dict['strehl_ratio'] = self.strehl_ratio
+
+		# --------------------------------------------------
+		# Pointing offsets
+		# --------------------------------------------------
+
 		map_counter = 0
 		tmpind = self.tilt_offset_start_index
-		while tmpind<self.tilt_offset_end_index:
+
+		while tmpind < self.tilt_offset_end_index:
+
 			results_dict[f'Az_Off_map{map_counter}'] = self.results.x[tmpind]
-			tmpind+=1
+			tmpind += 1
+
 			results_dict[f'El_Off_map{map_counter}'] = self.results.x[tmpind]
-			tmpind+=1
-			map_counter+=1
-		for i,val in enumerate(self.results.x[self.tilt_offset_end_index:]):
-			if i < len(zernike_labels):
-				zernlabel = zernike_labels[i]
-				# zernlabel = f'Noll {i}'
-			else:
-				zernlabel = f'OSA Index {i+4}'
-				# zernlabel = zernike_labels[i]
-			results_dict[zernlabel] = val#*1E6*(np.mean(self.tmpbeamclass.wavelengths)/(2.*np.pi*np.sqrt(2)))
-		for i in results_dict:
-			print(i+' ', results_dict[i])
+			tmpind += 1
+
+			map_counter += 1
+
+		# --------------------------------------------------
+		# Zernike coefficients
+		# --------------------------------------------------
+
+		zernike_results = self.results.x[self.tilt_offset_end_index:]
+
+		for i, val in enumerate(zernike_results):
+
+			osa_index = i + 4
+
+			# Use your descriptive name when available.
+			# Otherwise fall back to the OSA index.
+			zernlabel = zernike_labels.get(
+				osa_index,
+				f'OSA Index {osa_index}'
+			)
+
+			results_dict[zernlabel] = val
+
+		# --------------------------------------------------
+		# Print results
+		# --------------------------------------------------
+
 		for key, value in results_dict.items():
-				if isinstance(value, np.ndarray):
-					results_dict[key] = value.tolist()
+			print(key, value)
+
+		# --------------------------------------------------
+		# Convert numpy arrays/scalars for JSON
+		# --------------------------------------------------
+
+		for key, value in results_dict.items():
+
+			if isinstance(value, np.ndarray):
+				results_dict[key] = value.tolist()
+
+			elif isinstance(value, np.generic):
+				results_dict[key] = value.item()
+
+		# --------------------------------------------------
+		# Save JSON
+		# --------------------------------------------------
+
 		with open(savefilename, "w") as f:
 			json.dump(results_dict, f, indent=4)
+
 		self.resultsdict = results_dict
 
 		# --------------------------------------------------
 		# Save results as a PNG table
 		# --------------------------------------------------
 
-		units = [
-			'mJy/beam',
-			'mm',
-			'',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns',
-			'microns'
-		]
-
 		table_rows = []
 
-		for (label, value), unit in zip(results_dict.items(), units):
+		for label, value in results_dict.items():
 
-			# if label=='M2.Z':
-			# 	value = value*1E3
-			# 	value_str = f"{value:.6f}"
+			# Determine units from the parameter itself rather
+			# than from its position in the dictionary.
+			if label == 'source_amp':
+				unit = 'mJy/beam'
 
-			if isinstance(value, (int, float, np.integer, np.floating)) and label!='M2.Z_offset':
+			elif label == 'M2.Z_offset':
+				unit = 'mm'
+
+			elif label == 'strehl_ratio':
+				unit = ''
+
+			elif label.startswith('Az_Off_map'):
+				unit = 'microns'
+
+			elif label.startswith('El_Off_map'):
+				unit = 'microns'
+
+			else:
+				# Remaining parameters are Zernike coefficients
+				unit = 'microns'
+
+			# --------------------------------------------------
+			# Format values
+			# --------------------------------------------------
+
+			if (
+				isinstance(value, (int, float, np.integer, np.floating))
+				and label == 'M2.Z_offset'
+			):
+				# Convert meters -> mm for display
+				display_value = value * 1E3
+				value_str = f"{display_value:.6f}"
+
+			elif isinstance(
+				value,
+				(int, float, np.integer, np.floating)
+			):
 				value_str = f"{value:.2f}"
-			elif isinstance(value, (int, float, np.integer, np.floating)) and label=='M2.Z_offset':
-				value = value*1E3
-				value_str = f"{value:.6f}"
+
 			else:
 				value_str = str(value)
-
 
 			table_rows.append([
 				label,
@@ -2119,10 +2186,19 @@ class fit_beam_with_pointing_tilt_offsets_leastsquares:
 				unit
 			])
 
-		# Scale figure height with number of rows
-		fig_height = max(2.0, 0.35 * (len(table_rows) + 1))
+		# --------------------------------------------------
+		# Make table figure
+		# --------------------------------------------------
 
-		fig, ax = plt.subplots(figsize=(6, fig_height))
+		fig_height = max(
+			2.0,
+			0.35 * (len(table_rows) + 1)
+		)
+
+		fig, ax = plt.subplots(
+			figsize=(6, fig_height)
+		)
+
 		ax.axis("off")
 
 		table = ax.table(
@@ -2139,6 +2215,7 @@ class fit_beam_with_pointing_tilt_offsets_leastsquares:
 
 		# Style cells
 		for (row, col), cell in table.get_celld().items():
+
 			cell.set_edgecolor("black")
 			cell.set_linewidth(1.0)
 
@@ -2147,8 +2224,11 @@ class fit_beam_with_pointing_tilt_offsets_leastsquares:
 			else:
 				cell.set_facecolor("0.96")
 
-		# Use same filename as JSON, but replace extension with .png
-		pngfilename = os.path.splitext(savefilename)[0] + ".png"
+		# Same filename as JSON, but .png
+		pngfilename = (
+			os.path.splitext(savefilename)[0]
+			+ ".png"
+		)
 
 		plt.savefig(
 			pngfilename,
@@ -2157,6 +2237,7 @@ class fit_beam_with_pointing_tilt_offsets_leastsquares:
 		)
 
 		plt.close(fig)
+
 		self.resulttable_fname = pngfilename
 
 	def surface_plot(self,savefilename,vmin=-400,vmax=400):
@@ -2231,9 +2312,15 @@ class fit_beam_with_pointing_tilt_offsets_leastsquares:
 		"""
 		Save self.resultsdict in the same format as the LMT OOF
 		zernike .dat file.
+
+		Supports both the named low-order Zernike parameters and
+		higher-order parameters stored as "OSA Index N".
 		"""
 
-		# Full ordered list used by the .dat format
+		# --------------------------------------------------
+		# Full ordered list used by the LMT .dat format
+		# --------------------------------------------------
+
 		zernike_rows = [
 			(0,  "BIAS"),
 			(1,  "TILT_H"),
@@ -2282,37 +2369,65 @@ class fit_beam_with_pointing_tilt_offsets_leastsquares:
 			(44, "OCT_O"),
 		]
 
+		# --------------------------------------------------
 		# Map .dat names -> names used in self.resultsdict
+		#
+		# These preserve your existing naming convention.
+		# --------------------------------------------------
+
 		result_mapping = {
-			"AST_V":  "AST_V",
-			"AST_O":  "AST_O",
-			"COMA_H": "COMA_H",
-			"COMA_V": "COMA_V",
-			"TRE_O":  "TRE_O",
-			"TRE_V":  "TRE_V",
+			"AST_V":   "AST_V",
+			"AST_O":   "AST_O",
+			"COMA_H":  "COMA_H",
+			"COMA_V":  "COMA_V",
+			"TRE_O":   "TRE_O",
+			"TRE_V":   "TRE_V",
 			"SPH":     "SPH",
-			"2AST_V": "AST2_V",
-			"2AST_O": "AST2_O",
-			"TET_V":  "QUAD_V",
-			"TET_O":  "QUAD_O",
+			"2AST_V":  "AST2_V",
+			"2AST_O":  "AST2_O",
+			"TET_V":   "QUAD_V",
+			"TET_O":   "QUAD_O",
 		}
+
+		# --------------------------------------------------
+		# Write file
+		# --------------------------------------------------
 
 		with open(filename, "w") as f:
 
-			for index, label in zernike_rows:
+			for index, dat_label in zernike_rows:
 
-				if label in result_mapping:
-					result_label = result_mapping[label]
+				value = 0.0
+				flag = 0
 
-					value = float(self.resultsdict[result_label])
-					flag = 1
+				# ------------------------------------------
+				# First check for one of your explicitly
+				# named Zernike coefficients.
+				# ------------------------------------------
+
+				if dat_label in result_mapping:
+
+					result_label = result_mapping[dat_label]
+
+					if result_label in self.resultsdict:
+						value = float(self.resultsdict[result_label])
+						flag = 1
+
+				# ------------------------------------------
+				# Otherwise check whether this mode was
+				# stored generically as "OSA Index N".
+				# ------------------------------------------
 
 				else:
-					value = 0.0
-					flag = 0
+
+					osa_label = f"OSA Index {index}"
+
+					if osa_label in self.resultsdict:
+						value = float(self.resultsdict[osa_label])
+						flag = 1
 
 				f.write(
-					f"{index:d} {flag:d} {label} {value:.6f}\n"
+					f"{index:d} {flag:d} {dat_label} {value:.6f}\n"
 				)
 
 	def save_subref_dat(self, filename):
