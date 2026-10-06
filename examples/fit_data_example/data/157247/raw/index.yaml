@@ -1,0 +1,19 @@
+description:
+  - citlali data products
+date:
+  - 2026-09-08.15:52:43
+citlali_version:
+  - v4.0.0-62-ge0090e2d
+kids_version:
+  - 4a3428e
+tula_version:
+  - 28875ba
+files/dirs:
+  - index.yaml
+  - ppt_commissioning_pointing_157247_citlali.ecsv
+  - toltec_commissioning_a1100_pointing_157247_citlali.fits
+  - toltec_commissioning_a1400_pointing_157247_citlali.fits
+  - toltec_commissioning_a2000_pointing_157247_citlali.fits
+  - toltec_commissioning_pointing_157247_hist.nc
+  - toltec_commissioning_pointing_157247_psd.nc
+  - toltec_commissioning_pointing_157247_stats.nc

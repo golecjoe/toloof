@@ -1,0 +1,13 @@
+description:
+  - citlali data products
+date:
+  - 2026-09-08.15:52:43
+citlali_version:
+  - v4.0.0-62-ge0090e2d
+kids_version:
+  - 4a3428e
+tula_version:
+  - 28875ba
+files/dirs:
+  - index.yaml
+  - raw
