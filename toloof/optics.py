@@ -265,6 +265,35 @@ def gen_phase_error_secondary_tilt(x,y,del_alph_x,del_alph_y,f=17.5,F=525.,c_min
 
 	return tmpphaseerror
 
+def gen_phase_error_axial_feed_displacement(x,y,del_feed_z,f=17.5,F=525.,D=50.):
+	r = np.sqrt(x**2+y**2)
+	phi = np.arctan2(y,x)
+
+	sin_theta_p = (r/f)/((1+(r/(2.*f))**2))
+	sin_theta_f = (r/F)/((1+(r/(2.*F))**2))
+
+	cos_theta_f = np.sqrt(1-sin_theta_f**2)
+
+	tmpphaseerror = -del_feed_z*cos_theta_f
+	tmpphaseerror[np.where(r>(D/2.))]=0
+
+	return tmpphaseerror
+
+def gen_phase_error_lateral_feed_displacement(x,y,del_feed_x,del_feed_y,f=17.5,F=525.,D=50.):
+	r = np.sqrt(x**2+y**2)
+	phi = np.arctan2(y,x)
+
+	sin_theta_p = (r/f)/((1+(r/(2.*f))**2))
+	sin_theta_f = (r/F)/((1+(r/(2.*F))**2))
+
+	cos_theta_f = np.sqrt(1-sin_theta_f**2)
+	cos_theta_p = np.sqrt(1-sin_theta_p**2)
+
+	tmpphaseerror = -((del_feed_x*np.cos(phi))+(del_feed_y*np.sin(phi)))*sin_theta_f
+	tmpphaseerror[np.where(r>(D/2.))]=0
+
+	return tmpphaseerror
+
 
 def gaussian(rarray,sig):
 	"""
