@@ -260,11 +260,11 @@ class Beam:
 			If True, show a plot of the illumination pattern.
 		"""
 
-		sig0 = aperture_fwhm/(2*np.sqrt(2*np.log(2)))
+		sig0 = (aperture_fwhm)/(2*np.sqrt(2*np.log(2)))
 		edge_taper = np.ones([self.N,self.N])
 		edge_taper[np.where(self.r>edge_taper_diameter/2.)]=0
 		illumination = gaussian(self.r,sig0)*edge_taper
-		self.illumination = illumination
+		self.illumination = np.sqrt(illumination)
 		if plot_illumination:
 			plt.figure()
 			plt.imshow(self.illumination,extent=([-self.L/2, self.L/2, -self.L/2, self.L/2]))

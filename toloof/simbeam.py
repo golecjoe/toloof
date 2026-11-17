@@ -151,7 +151,7 @@ class SimBeam:
 		edge_taper = np.ones([self.N,self.N])
 		edge_taper[np.where(self.r>edge_taper_diameter/2.)]=0
 		illumination = gaussian(self.r,sig0)*edge_taper
-		self.illumination = illumination
+		self.illumination = np.sqrt(illumination)
 		if plot_illumination:
 			plt.figure()
 			plt.imshow(self.illumination,extent=([-self.L/2, self.L/2, -self.L/2, self.L/2]))
@@ -713,6 +713,82 @@ def make_image_hdu(image,array,extname):
 
 	return image_hdu
 
+def make_tolteca_simu_input_fits(map_a2000,map_a1400,map_a1100,filepath):
+	primary_hdu = fits.PrimaryHDU(None,header=map_a1100.wcs.to_header())
+	image_hdu_a1100_I = fits.ImageHDU(map_a1100,header=map_a1100.wcs.to_header())
+	image_hdu_a1100_Q = fits.ImageHDU(None)
+	image_hdu_a1100_U = fits.ImageHDU(None)
+	image_hdu_a1100_I.header['MJDREF'] = (0.,'[d] MJD of fiducial time')
+	# image_hdu_a1100_I.header['RADESYS'] = (self.original_header['RADESYSA'],'Equatorial coordinate system')
+	image_hdu_a1100_I.header['EXTNAME'] = ('A1100_I','extension name')
+	image_hdu_a1100_I.header['WAVELNTH'] = (1100.0,'[micrometer] wavelength')
+	image_hdu_a1100_I.header['STOKES'] = ('I','Stokes Parameter')
+	image_hdu_a1100_I.header['SIGUNIT'] = ('MJy/sr','Map units')
+	image_hdu_a1100_Q.header['MJDREF'] = (0.,'[d] MJD of fiducial time')
+	# image_hdu_a1100_Q.header['RADESYS'] = (self.original_header['RADESYSA'],'Equatorial coordinate system')
+	image_hdu_a1100_Q.header['EXTNAME'] = ('A1100_Q','extension name')
+	image_hdu_a1100_Q.header['WAVELNTH'] = (1100.0,'[micrometer] wavelength')
+	image_hdu_a1100_Q.header['STOKES'] = ('Q','Stokes Parameter')
+	image_hdu_a1100_Q.header['SIGUNIT'] = ('MJy/sr','Map units')
+	image_hdu_a1100_U.header['MJDREF'] = (0.,'[d] MJD of fiducial time')
+	# image_hdu_a1100_U.header['RADESYS'] = (self.original_header['RADESYSA'],'Equatorial coordinate system')
+	image_hdu_a1100_U.header['EXTNAME'] = ('A1100_U','extension name')
+	image_hdu_a1100_U.header['WAVELNTH'] = (1100.0,'[micrometer] wavelength')
+	image_hdu_a1100_U.header['STOKES'] = ('U','Stokes Parameter')
+	image_hdu_a1100_U.header['SIGUNIT'] = ('MJy/sr','Map units')
+
+	image_hdu_a1400_I = fits.ImageHDU(map_a1400,header=map_a1400.wcs.to_header())
+	image_hdu_a1400_Q = fits.ImageHDU(None)
+	image_hdu_a1400_U = fits.ImageHDU(None)
+
+	image_hdu_a1400_I.header['MJDREF'] = (0.,'[d] MJD of fiducial time')
+	# image_hdu_a1400_I.header['RADESYS'] = (self.original_header['RADESYSA'],'Equatorial coordinate system')
+	image_hdu_a1400_I.header['EXTNAME'] = ('A1400_I','extension name')
+	image_hdu_a1400_I.header['WAVELNTH'] = (1400.0,'[micrometer] wavelength')
+	image_hdu_a1400_I.header['STOKES'] = ('I','Stokes Parameter')
+	image_hdu_a1400_I.header['SIGUNIT'] = ('MJy/sr','Map units')
+
+	image_hdu_a1400_Q.header['MJDREF'] = (0.,'[d] MJD of fiducial time')
+	# image_hdu_a1400_Q.header['RADESYS'] = (self.original_header['RADESYSA'],'Equatorial coordinate system')
+	image_hdu_a1400_Q.header['EXTNAME'] = ('A1400_Q','extension name')
+	image_hdu_a1400_Q.header['WAVELNTH'] = (1400.0,'[micrometer] wavelength')
+	image_hdu_a1400_Q.header['STOKES'] = ('Q','Stokes Parameter')
+	image_hdu_a1400_Q.header['SIGUNIT'] = ('MJy/sr','Map units')
+
+	image_hdu_a1400_U.header['MJDREF'] = (0.,'[d] MJD of fiducial time')
+	# image_hdu_a1400_U.header['RADESYS'] = (self.original_header['RADESYSA'],'Equatorial coordinate system')
+	image_hdu_a1400_U.header['EXTNAME'] = ('A1400_U','extension name')
+	image_hdu_a1400_U.header['WAVELNTH'] = (1400.0,'[micrometer] wavelength')
+	image_hdu_a1400_U.header['STOKES'] = ('U','Stokes Parameter')
+	image_hdu_a1400_U.header['SIGUNIT'] = ('MJy/sr','Map units')
+
+	image_hdu_a2000_I = fits.ImageHDU(map_a2000,header=map_a2000.wcs.to_header())
+	image_hdu_a2000_Q = fits.ImageHDU(None)
+	image_hdu_a2000_U = fits.ImageHDU(None)
+
+	image_hdu_a2000_I.header['MJDREF'] = (0.,'[d] MJD of fiducial time')
+	# image_hdu_a2000_I.header['RADESYS'] = (self.original_header['RADESYSA'],'Equatorial coordinate system')
+	image_hdu_a2000_I.header['EXTNAME'] = ('A2000_I','extension name')
+	image_hdu_a2000_I.header['WAVELNTH'] = (2000.0,'[micrometer] wavelength')
+	image_hdu_a2000_I.header['STOKES'] = ('I','Stokes Parameter')
+	image_hdu_a2000_I.header['SIGUNIT'] = ('MJy/sr','Map units')
+
+	image_hdu_a2000_Q.header['MJDREF'] = (0.,'[d] MJD of fiducial time')
+	# image_hdu_a2000_Q.header['RADESYS'] = (self.original_header['RADESYSA'],'Equatorial coordinate system')
+	image_hdu_a2000_Q.header['EXTNAME'] = ('A2000_Q','extension name')
+	image_hdu_a2000_Q.header['WAVELNTH'] = (2000.0,'[micrometer] wavelength')
+	image_hdu_a2000_Q.header['STOKES'] = ('Q','Stokes Parameter')
+	image_hdu_a2000_Q.header['SIGUNIT'] = ('MJy/sr','Map units')
+
+	image_hdu_a2000_U.header['MJDREF'] = (0.,'[d] MJD of fiducial time')
+	# image_hdu_a2000_U.header['RADESYS'] = (self.original_header['RADESYSA'],'Equatorial coordinate system')
+	image_hdu_a2000_U.header['EXTNAME'] = ('A2000_U','extension name')
+	image_hdu_a2000_U.header['WAVELNTH'] = (2000.0,'[micrometer] wavelength')
+	image_hdu_a2000_U.header['STOKES'] = ('U','Stokes Parameter')
+	image_hdu_a2000_U.header['SIGUNIT'] = ('MJy/sr','Map units')
+	                
+	hdul_save = fits.HDUList([primary_hdu, image_hdu_a1100_I, image_hdu_a1100_Q,image_hdu_a1100_U,image_hdu_a1400_I,image_hdu_a1400_Q,image_hdu_a1400_U,image_hdu_a2000_I,image_hdu_a2000_Q,image_hdu_a2000_U])
+	hdul_save.writeto(filepath,overwrite=True)
 
 
 

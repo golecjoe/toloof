@@ -29,11 +29,11 @@ The code follows the OSA/ANSI index convention so this should be a straightforwa
 results_dir = f'simulation_results/'
 os.makedirs(results_dir, exist_ok=True)
 
-test_freqs = np.array([150.0]) # in GHz. An array. If ordered multiple values are passed will integrate over the uniform bandpass
+test_freqs = np.array([280.0]) # in GHz. An array. If ordered multiple values are passed will integrate over the uniform bandpass
 test_wavelengths = 300.E-3/test_freqs
 
-pixel_size_deg = 2.0/3600. # in degrees
-map_size_deg = 10./60. # in degrees
+pixel_size_deg = 1.0/3600. # in degrees
+map_size_deg = 5./60. # in degrees
 
 simbeam1 = SimBeam(test_wavelengths,pixel_size_deg,map_size_deg,bandpass = None)
 
@@ -60,8 +60,7 @@ c_microns[12] = 0. # SPHERICAL ABERRATION
 c_microns[13] = 0. # VERTICAL SECONDARY ASTIGMATISM
 c_microns[14] = 0. # VERTICAL QUADFOIL
 
-M2z_offset = 0.0 # meters
-
+M2z_offset = 0.0# meters
 
 
 tmppsf1 = simbeam1.make_psf(c=c_microns,
@@ -74,7 +73,7 @@ tmppsf1 = simbeam1.make_psf(c=c_microns,
 corners_tmp = np.rad2deg(enmap.corners(tmppsf1.shape,tmppsf1.wcs))
 imextent_tmp = [corners_tmp[0,1],corners_tmp[1,1],corners_tmp[0,0],corners_tmp[1,0]]
 fig=plt.figure(figsize=(8,8))
-im = plt.imshow(tmppsf1,extent=imextent_tmp,origin='lower',vmin=0.,vmax=1.)
+im = plt.imshow(tmppsf1,extent=imextent_tmp,origin='lower',vmin=0.,vmax=0.5)
 # im = plt.imshow(10*np.log10(tmppsf1),extent=imextent_tmp,origin='lower',vmin=-30,vmax=0)
 plt.xticks(fontsize=10)
 plt.yticks(fontsize=10)
